@@ -1,0 +1,152 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* Smile Connect light palette */
+  --main-background-color: #CAD4D9;
+  --color-neutral-black: #FFF;
+  --color-neutral-n1: #E9EFF2;
+  --color-neutral-n2: #CAD4D9;
+  --color-neutral-n3: #929A9E;
+  --color-neutral-n4: #464A4D;
+  --color-neutral-n5: #333638;
+  --color-neutral-n6: #272C2E;
+  --color-neutral-blanc: #181D1F;
+
+  --color-principal-1: #1F4659;
+  --color-principal-2: #316E8C;
+  --color-principal-3: #4396BF;
+
+  --color-action-act-1: #0D2759;
+  --color-action-act-2: #174299;
+  --color-action-act-3: #215ED9;
+
+  --color-state-s-1-1: #C7F2E4;
+  --color-state-s-1-2: #1C8C67;
+  --color-state-s-2-1: #F7DFC1;
+  --color-state-s-2-2: #CC8329;
+  --color-state-s-3-1: #FFCCD0;
+  --color-state-s-3-2: #CC2936;
+
+  /* Tailwind semantic mappings */
+  --background: var(--color-neutral-n1);
+  --foreground: var(--color-neutral-blanc);
+  --card: var(--color-neutral-black);
+  --card-foreground: var(--color-neutral-blanc);
+  --popover: var(--color-neutral-black);
+  --popover-foreground: var(--color-neutral-blanc);
+  --primary: var(--color-principal-3);
+  --primary-foreground: var(--color-neutral-black);
+  --secondary: var(--color-neutral-n2);
+  --secondary-foreground: var(--color-neutral-blanc);
+  --muted: var(--color-neutral-n3);
+  --muted-foreground: var(--color-neutral-n5);
+  --accent: var(--color-action-act-3);
+  --accent-foreground: var(--color-neutral-black);
+  --destructive: var(--color-state-s-3-2);
+  --border: var(--color-neutral-n3);
+  --input: var(--color-neutral-n3);
+  --ring: var(--color-principal-2);
+}
+
+.dark {
+  /* Smile Connect dark palette */
+  --main-background-color: #333638;
+  --color-neutral-black: #181D1F;
+  --color-neutral-n1: #272C2E;
+  --color-neutral-n2: #333638;
+  --color-neutral-n3: #464A4D;
+  --color-neutral-n4: #929A9E;
+  --color-neutral-n5: #CAD4D9;
+  --color-neutral-n6: #E9EFF2;
+  --color-neutral-blanc: #FFF;
+
+  --color-principal-1: #4396BF;
+  --color-principal-2: #316E8C;
+  --color-principal-3: #1F4659;
+
+  --color-action-act-1: #215ED9;
+  --color-action-act-2: #174299;
+  --color-action-act-3: #0D2759;
+
+  --color-state-s-1-1: #1C8C67;
+  --color-state-s-1-2: #C7F2E4;
+  --color-state-s-2-1: #CC8329;
+  --color-state-s-2-2: #F7DFC1;
+  --color-state-s-3-1: #CC2936;
+  --color-state-s-3-2: #FFCCD0;
+
+  /* Tailwind semantic mappings */
+  --background: var(--color-neutral-n1);
+  --foreground: var(--color-neutral-blanc);
+  --card: var(--color-neutral-n2);
+  --card-foreground: var(--color-neutral-blanc);
+  --popover: var(--color-neutral-n2);
+  --popover-foreground: var(--color-neutral-blanc);
+  --primary: var(--color-principal-1);
+  --primary-foreground: var(--color-neutral-blanc);
+  --secondary: var(--color-neutral-n3);
+  --secondary-foreground: var(--color-neutral-blanc);
+  --muted: var(--color-neutral-n3);
+  --muted-foreground: var(--color-neutral-n4);
+  --accent: var(--color-action-act-1);
+  --accent-foreground: var(--color-neutral-blanc);
+  --destructive: var(--color-state-s-3-1);
+  --border: var(--color-neutral-n3);
+  --input: var(--color-neutral-n3);
+  --ring: var(--color-principal-2);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neutral-n3) transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
