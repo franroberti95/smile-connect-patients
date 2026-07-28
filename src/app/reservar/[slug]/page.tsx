@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { api } from "@/lib/api"
-import { BookingProductSelector, type BookableProduct } from "@/components/booking-product-selector"
+import { BookingFlow, type BookableProduct, type ClinicProfessional } from "@/components/booking-flow"
 
 interface ClinicBySlugResponse {
   clinicId: number
   name: string
   slug: string
   logoUrl: string | null
+  timezone: string
+  calendarMinutesInterval: number
+  professionals: ClinicProfessional[]
   booking: {
     enabled: boolean
     appointmentPrice?: number
@@ -63,7 +66,12 @@ export default async function BookingPage({ params }: BookingPageProps) {
         </CardHeader>
         <CardContent>
           {clinic.booking.products.length > 0 ? (
-            <BookingProductSelector products={clinic.booking.products} />
+            <BookingFlow
+              slug={clinic.slug}
+              products={clinic.booking.products}
+              professionals={clinic.professionals}
+              timezone={clinic.timezone}
+            />
           ) : (
             <p className="text-sm text-muted-foreground">
               Esta clínica todavía no configuró servicios para reserva online.
