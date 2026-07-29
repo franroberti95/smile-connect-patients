@@ -57,6 +57,14 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">No tenés turnos próximos.</p>
+            {selectedClinic?.slug && (
+              <Button
+                className="mt-4"
+                onClick={() => router.push(`/reservar/${selectedClinic.slug}`)}
+              >
+                Reservar turno
+              </Button>
+            )}
           </CardContent>
         </Card>
 
