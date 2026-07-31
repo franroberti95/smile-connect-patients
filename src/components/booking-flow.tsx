@@ -197,13 +197,14 @@ export function BookingFlow({
             debitCard: "all",
           },
         },
-        callback: {
+        callbacks: {
           onReady: () => {},
           onError: (error: unknown) => {
             console.error("Payment brick error", error)
             setBookingError("No pudimos cargar el formulario de pago")
           },
-          onSubmit: ({ formData }: { formData: PaymentBrickFormData }) => handleBook(formData),
+          onSubmit: ({ formData }: { formData: PaymentBrickFormData }) =>
+            handleBook(formData),
         },
       })
       .then((controller) => {
@@ -320,6 +321,7 @@ export function BookingFlow({
     } catch (error) {
       setBookingError(error instanceof ApiError ? error.message : "No pudimos procesar el pago")
       setShowPaymentBrick(false)
+      throw error
     } finally {
       setBookingLoading(false)
     }
