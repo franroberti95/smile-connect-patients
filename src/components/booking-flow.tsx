@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,33 @@ interface BookingFlowProps {
   products: BookableProduct[]
   professionals: ClinicProfessional[]
   timezone: string
+  paymentMode: "full" | "deposit"
+  depositPercentage?: number
+  feePayer: "clinic" | "patient"
+  feePercentage: number
+  mpPublicKey: string
+}
+
+declare global {
+  interface Window {
+    MercadoPago?: new (publicKey: string, options?: Record<string, unknown>) => {
+      bricks: () => {
+        create: (
+          brickType: string,
+          containerId: string,
+          settings: Record<string, unknown>
+        ) => Promise<{ unmount: () => void }>
+      }
+    }
+  }
+}
+
+interface PaymentBrickFormData {
+  token: string
+  payment_method_id: string
+  issuer_id?: string
+  installments: number
+  payer?: { email?: string }
 }
 
 const currencyCodeById: Record<number, string> = {
@@ -74,7 +101,17 @@ function toTimezoneDateString(date: Date, timezone: string): string {
   return formatter.format(date)
 }
 
-export function BookingFlow({ slug, products, professionals, timezone }: BookingFlowProps) {
+export function BookingFlow({
+  slug,
+  products,
+  professionals,
+  timezone,
+  paymentMode,
+  depositPercentage,
+  feePayer,
+  feePercentage,
+  mpPublicKey,
+}: BookingFlowProps) {
   const { user } = useAuth()
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null)
@@ -93,6 +130,10 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
+  const [showPaymentBrick, setShowPaymentBrick] = useState(false)
+  const [mpSdkReady, setMpSdkReady] = useState(false)
+  const paymentBrickContainerRef = useRef<HTMLDivElement>(null)
+  const paymentBrickControllerRef = useRef<{ unmount: () => void } | null>(null)
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.productId === selectedProductId),
@@ -113,6 +154,73 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
       style: "currency",
       currency: currencyCodeById[currencyId] || "ARS",
     }).format(amount)
+
+  const pricing = useMemo(() => {
+    if (!selectedProduct) return null
+    const baseAmount =
+      paymentMode === "deposit" && depositPercentage
+        ? Math.round(selectedProduct.amount * (depositPercentage / 100) * 100) / 100
+        : selectedProduct.amount
+    const feeAmount = Math.round(baseAmount * (feePercentage / 100) * 100) / 100
+    const totalToPay = feePayer === "patient" ? Math.round((baseAmount + feeAmount) * 100) / 100 : baseAmount
+    return { baseAmount, feeAmount, totalToPay }
+  }, [selectedProduct, paymentMode, depositPercentage, feePayer, feePercentage])
+
+  useEffect(() => {
+    if (window.MercadoPago) {
+      setMpSdkReady(true)
+      return
+    }
+    const script = document.createElement("script")
+    script.src = "https://sdk.mercadopago.com/js/v2"
+    script.async = true
+    script.onload = () => setMpSdkReady(true)
+    document.body.appendChild(script)
+  }, [])
+
+  useEffect(() => {
+    if (!showPaymentBrick || !mpSdkReady || !pricing || !user?.email) return
+    if (!window.MercadoPago || !paymentBrickContainerRef.current) return
+
+    let cancelled = false
+    const mp = new window.MercadoPago(mpPublicKey, { locale: "es-AR" })
+
+    mp.bricks()
+      .create("payment", "payment-brick-container", {
+        initialization: {
+          amount: pricing.totalToPay,
+          payer: { email: user.email },
+        },
+        customization: {
+          paymentMethods: {
+            creditCard: "all",
+            debitCard: "all",
+          },
+        },
+        callback: {
+          onReady: () => {},
+          onError: (error: unknown) => {
+            console.error("Payment brick error", error)
+            setBookingError("No pudimos cargar el formulario de pago")
+          },
+          onSubmit: ({ formData }: { formData: PaymentBrickFormData }) => handleBook(formData),
+        },
+      })
+      .then((controller) => {
+        if (cancelled) {
+          controller.unmount()
+          return
+        }
+        paymentBrickControllerRef.current = controller
+      })
+
+    return () => {
+      cancelled = true
+      paymentBrickControllerRef.current?.unmount()
+      paymentBrickControllerRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPaymentBrick, mpSdkReady, pricing?.totalToPay, user?.email])
 
   const loadSlots = async (date: Date, product: BookableProduct, professionalId?: number) => {
     setSlotsLoading(true)
@@ -143,6 +251,7 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
     setSlots([])
     setBookingSuccess(false)
     setBookingError(null)
+    setShowPaymentBrick(false)
   }
 
   useEffect(() => {
@@ -167,12 +276,17 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
     }
   }
 
-  const handleBook = async () => {
-    if (!selectedProduct || !selectedSlot || !user) return
+  const handleContinueToPayment = () => {
     if (!patientName.trim() || !patientSurname.trim()) {
       setBookingError("Completá nombre y apellido")
       return
     }
+    setBookingError(null)
+    setShowPaymentBrick(true)
+  }
+
+  const handleBook = async (formData: PaymentBrickFormData) => {
+    if (!selectedProduct || !selectedSlot || !user) return
     setBookingLoading(true)
     setBookingError(null)
     try {
@@ -190,14 +304,22 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
             patient: {
               name: patientName.trim(),
               surname: patientSurname.trim(),
+              email: user.email,
               phoneNumber: patientPhone.trim(),
+            },
+            payment: {
+              token: formData.token,
+              paymentMethodId: formData.payment_method_id,
+              issuerId: formData.issuer_id,
+              installments: formData.installments,
             },
           },
         }
       )
       setBookingSuccess(true)
     } catch (error) {
-      setBookingError(error instanceof ApiError ? error.message : "No pudimos reservar el turno")
+      setBookingError(error instanceof ApiError ? error.message : "No pudimos procesar el pago")
+      setShowPaymentBrick(false)
     } finally {
       setBookingLoading(false)
     }
@@ -327,7 +449,10 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
                 <button
                   key={slot.start}
                   type="button"
-                  onClick={() => setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })}
+                  onClick={() => {
+                    setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })
+                    setShowPaymentBrick(false)
+                  }}
                   className={`rounded-md border p-2 text-center text-sm transition-colors ${
                     selectedSlot?.start === slot.start
                       ? "border-primary bg-primary/5"
@@ -374,15 +499,42 @@ export function BookingFlow({ slug, products, professionals, timezone }: Booking
               placeholder="+54 9 11 1234 5678"
             />
           </div>
+
+          {pricing && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">
+                  {paymentMode === "deposit" ? "Seña a pagar ahora" : "Total a pagar ahora"}
+                </span>
+                <span className="font-semibold">
+                  {formatAmount(pricing.totalToPay, selectedProduct!.currencyId)}
+                </span>
+              </div>
+              {feePayer === "patient" && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Incluye comisión de pago del {feePercentage}%
+                </p>
+              )}
+            </div>
+          )}
+
           {bookingError && <p className="text-sm text-destructive">{bookingError}</p>}
-          <Button
-            type="button"
-            className="w-full"
-            disabled={bookingLoading}
-            onClick={handleBook}
-          >
-            {bookingLoading ? "Reservando..." : "Confirmar reserva"}
-          </Button>
+
+          {!showPaymentBrick ? (
+            <Button type="button" className="w-full" onClick={handleContinueToPayment}>
+              Continuar al pago
+            </Button>
+          ) : (
+            <div className="space-y-3">
+              {!mpSdkReady && (
+                <p className="text-sm text-muted-foreground">Cargando formulario de pago...</p>
+              )}
+              <div id="payment-brick-container" ref={paymentBrickContainerRef} />
+              {bookingLoading && (
+                <p className="text-sm text-muted-foreground">Procesando pago y reservando turno...</p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -18,6 +18,9 @@ interface ClinicBySlugResponse {
     depositPercentage?: number
     bookingConfirmationMessage?: string
     cancellationPolicy?: string
+    feePayer?: "clinic" | "patient"
+    feePercentage?: number
+    mpPublicKey?: string | null
     products: BookableProduct[]
   }
 }
@@ -55,6 +58,21 @@ export default async function BookingPage({ params }: BookingPageProps) {
     )
   }
 
+  if (!clinic.booking.mpPublicKey) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center p-6">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle>Pagos no disponibles</CardTitle>
+            <CardDescription>
+              {clinic.name} todavía no conectó una cuenta de Mercado Pago para recibir pagos online.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </main>
+    )
+  }
+
   return (
     <main className="flex flex-1 flex-col items-center justify-center p-6">
       <Card className="w-full max-w-lg">
@@ -71,6 +89,11 @@ export default async function BookingPage({ params }: BookingPageProps) {
               products={clinic.booking.products}
               professionals={clinic.professionals}
               timezone={clinic.timezone}
+              paymentMode={clinic.booking.paymentMode ?? "full"}
+              depositPercentage={clinic.booking.depositPercentage}
+              feePayer={clinic.booking.feePayer ?? "clinic"}
+              feePercentage={clinic.booking.feePercentage ?? 3}
+              mpPublicKey={clinic.booking.mpPublicKey}
             />
           ) : (
             <p className="text-sm text-muted-foreground">

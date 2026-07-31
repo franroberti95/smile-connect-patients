@@ -4,11 +4,13 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/components/auth-provider"
+import { useAuth, type PatientClinic } from "@/components/auth-provider"
+import { api } from "@/lib/api"
+import { getIdToken } from "@/lib/firebase"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const { user, loading, selectedClinic, logout } = useAuth()
+  const { user, loading, selectedClinic, selectClinic, logout } = useAuth()
 
   useEffect(() => {
     if (!loading && !user) {
@@ -17,6 +19,31 @@ export default function DashboardPage() {
       router.replace("/select-clinic")
     }
   }, [loading, router, selectedClinic, user])
+
+  // Refresh the cached clinic (slug, logo, etc. may have changed since it was stored).
+  useEffect(() => {
+    if (!selectedClinic) return
+
+    const refreshClinic = async () => {
+      try {
+        const idToken = await getIdToken()
+        if (!idToken) return
+
+        const response = await api<{ clinics: PatientClinic[] }>("/api/public/patient/clinics", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        })
+        const fresh = response.clinics.find((c) => c.clinicId === selectedClinic.clinicId)
+        if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedClinic)) {
+          selectClinic(fresh)
+        }
+      } catch {
+        // Ignore refresh errors; keep using the cached clinic.
+      }
+    }
+
+    void refreshClinic()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClinic?.clinicId])
 
   if (loading) {
     return (
