@@ -54,10 +54,10 @@ declare global {
 }
 
 interface PaymentBrickFormData {
-  token: string
+  token?: string
   payment_method_id: string
   issuer_id?: string
-  installments: number
+  installments?: number
   payer?: { email?: string }
 }
 
@@ -130,6 +130,7 @@ export function BookingFlow({
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
+  const [bookingPending, setBookingPending] = useState(false)
   const [showPaymentBrick, setShowPaymentBrick] = useState(false)
   const [mpSdkReady, setMpSdkReady] = useState(false)
   const paymentBrickContainerRef = useRef<HTMLDivElement>(null)
@@ -189,12 +190,13 @@ export function BookingFlow({
       .create("payment", "payment-brick-container", {
         initialization: {
           amount: pricing.totalToPay,
-          payer: { email: user.email },
+          payer: { email: user.email, entityType: "individual" },
         },
         customization: {
           paymentMethods: {
             creditCard: "all",
             debitCard: "all",
+            mercadoPago: "all",
           },
         },
         callbacks: {
@@ -292,7 +294,7 @@ export function BookingFlow({
     setBookingError(null)
     try {
       const idToken = await user.getIdToken()
-      await api(
+      const result = await api<{ paymentStatus?: string }>(
         "/api/public/appointments",
         {
           method: "POST",
@@ -317,7 +319,11 @@ export function BookingFlow({
           },
         }
       )
-      setBookingSuccess(true)
+      if (result.paymentStatus === "in_process" || result.paymentStatus === "pending") {
+        setBookingPending(true)
+      } else {
+        setBookingSuccess(true)
+      }
     } catch (error) {
       setBookingError(error instanceof ApiError ? error.message : "No pudimos procesar el pago")
       setShowPaymentBrick(false)
@@ -347,6 +353,32 @@ export function BookingFlow({
             }}
           >
             Reservar otro turno
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (bookingPending) {
+    return (
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="p-6 text-center space-y-3">
+          <p className="font-semibold">Estamos confirmando tu pago</p>
+          <p className="text-sm text-muted-foreground">
+            Tu turno quedará reservado apenas se confirme el pago. Te avisaremos por correo o WhatsApp.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setBookingPending(false)
+              setSelectedProductId(null)
+              setSelectedProfessionalId(null)
+              setSelectedSlot(null)
+              setSlots([])
+            }}
+          >
+            Volver al inicio
           </Button>
         </CardContent>
       </Card>
