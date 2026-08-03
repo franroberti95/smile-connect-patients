@@ -15,7 +15,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!loading && !user) {
       router.replace("/login")
-    } else if (!loading && !selectedClinic) {
+    } else if (!loading && (!selectedClinic || selectedClinic.status !== "active")) {
       router.replace("/select-clinic")
     }
   }, [loading, router, selectedClinic, user])
@@ -33,7 +33,16 @@ export default function DashboardPage() {
           headers: { Authorization: `Bearer ${idToken}` },
         })
         const fresh = response.clinics.find((c) => c.clinicId === selectedClinic.clinicId)
-        if (fresh && JSON.stringify(fresh) !== JSON.stringify(selectedClinic)) {
+        if (!fresh) {
+          router.replace("/select-clinic")
+          return
+        }
+        if (fresh.status !== "active") {
+          selectClinic(fresh)
+          router.replace("/select-clinic")
+          return
+        }
+        if (JSON.stringify(fresh) !== JSON.stringify(selectedClinic)) {
           selectClinic(fresh)
         }
       } catch {

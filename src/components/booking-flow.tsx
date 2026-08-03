@@ -1,6 +1,16 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  Stethoscope,
+  User,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -333,25 +343,43 @@ export function BookingFlow({
     }
   }
 
+  const handleReset = () => {
+    setBookingSuccess(false)
+    setBookingPending(false)
+    setSelectedProductId(null)
+    setSelectedProfessionalId(null)
+    setSelectedSlot(null)
+    setSlots([])
+    setShowPaymentBrick(false)
+    setBookingError(null)
+  }
+
+  const steps = useMemo(() => {
+    const base = [
+      { id: "service", label: "Servicio", done: !!selectedProduct, active: true },
+      ...(selectedProduct?.professionalChoiceMode === "patient"
+        ? [{ id: "professional", label: "Profesional", done: !!selectedProfessionalId, active: !!selectedProduct }]
+        : []),
+      { id: "datetime", label: "Día y hora", done: !!selectedSlot, active: !!selectedProduct },
+      { id: "payment", label: "Pago", done: bookingSuccess, active: !!selectedSlot },
+    ]
+    return base
+  }, [selectedProduct, selectedProfessionalId, selectedSlot, bookingSuccess])
+
   if (bookingSuccess) {
     return (
       <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-6 text-center space-y-3">
-          <p className="font-semibold">¡Turno reservado!</p>
-          <p className="text-sm text-muted-foreground">
-            Te enviaremos la confirmación por correo o WhatsApp.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setBookingSuccess(false)
-              setSelectedProductId(null)
-              setSelectedProfessionalId(null)
-              setSelectedSlot(null)
-              setSlots([])
-            }}
-          >
+        <CardContent className="p-8 text-center space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Check className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold">¡Turno reservado!</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Te enviaremos la confirmación por correo o WhatsApp.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleReset}>
             Reservar otro turno
           </Button>
         </CardContent>
@@ -362,22 +390,17 @@ export function BookingFlow({
   if (bookingPending) {
     return (
       <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-6 text-center space-y-3">
-          <p className="font-semibold">Estamos confirmando tu pago</p>
-          <p className="text-sm text-muted-foreground">
-            Tu turno quedará reservado apenas se confirme el pago. Te avisaremos por correo o WhatsApp.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setBookingPending(false)
-              setSelectedProductId(null)
-              setSelectedProfessionalId(null)
-              setSelectedSlot(null)
-              setSlots([])
-            }}
-          >
+        <CardContent className="p-8 text-center space-y-4">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Clock className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="text-lg font-semibold">Estamos confirmando tu pago</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Tu turno quedará reservado apenas se confirme el pago. Te avisaremos por correo o WhatsApp.
+            </p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleReset}>
             Volver al inicio
           </Button>
         </CardContent>
@@ -385,192 +408,317 @@ export function BookingFlow({
     )
   }
 
+  const selectedProfessionalName = useMemo(() => {
+    if (!selectedProduct) return null
+    if (selectedProduct.professionalChoiceMode !== "patient") return "Automático"
+    const professional = professionals.find((p) => p.professionalId === selectedProfessionalId)
+    return professional ? `${professional.surname}, ${professional.name}` : null
+  }, [selectedProduct, selectedProfessionalId, professionals])
+
   return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <h2 className="font-semibold">Elegí el servicio</h2>
-        <div className="space-y-2">
-          {products.map((product) => (
-            <button
-              key={product.productId}
-              type="button"
-              onClick={() => handleProductSelect(product.productId)}
-              className={`w-full rounded-lg border p-4 text-left transition-colors ${
-                selectedProductId === product.productId
-                  ? "border-primary bg-primary/5"
-                  : "hover:border-primary/50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-muted-foreground">{product.procedureName}</p>
-                </div>
-                <p className="font-medium">{formatAmount(product.amount, product.currencyId)}</p>
+    <div className="flex flex-col gap-6">
+      {/* Stepper */}
+      <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          {steps.map((step, index) => (
+            <div key={step.id} className="flex flex-1 items-center gap-2">
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                  step.done
+                    ? "bg-primary text-primary-foreground"
+                    : step.active
+                      ? "border-2 border-primary text-primary"
+                      : "border-2 border-muted-foreground/30 text-muted-foreground"
+                }`}
+              >
+                {step.done ? <Check className="h-4 w-4" /> : index + 1}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Duración estimada: {product.durationMinutes} min
-              </p>
-            </button>
+              <span
+                className={`hidden text-xs font-medium sm:inline ${
+                  step.done || step.active ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {step.label}
+              </span>
+              {index < steps.length - 1 && (
+                <div
+                  className={`ml-2 hidden h-px flex-1 sm:block ${
+                    step.done ? "bg-primary" : "bg-border"
+                  }`}
+                />
+              )}
+            </div>
           ))}
         </div>
       </div>
 
-      {selectedProduct && selectedProduct.professionalChoiceMode === "patient" && availableProfessionals.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="font-semibold">Elegí el profesional</h2>
-          <div className="space-y-2">
-            {availableProfessionals.map((professional) => (
-              <button
-                key={professional.professionalId}
-                type="button"
-                onClick={() => handleProfessionalSelect(professional.professionalId)}
-                className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                  selectedProfessionalId === professional.professionalId
-                    ? "border-primary bg-primary/5"
-                    : "hover:border-primary/50"
-                }`}
-              >
-                {professional.surname}, {professional.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedProduct && (selectedProduct.professionalChoiceMode !== "patient" || selectedProfessionalId !== null) && (
-        <div className="space-y-3">
-          <h2 className="font-semibold">Elegí el día</h2>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const prev = new Date(selectedDate)
-                prev.setDate(prev.getDate() - 1)
-                handleDateChange(prev)
-              }}
-            >
-              ←
-            </Button>
-            <span className="flex-1 text-center text-sm font-medium">
-              {formatDateLabel(selectedDate, timezone)}
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const next = new Date(selectedDate)
-                next.setDate(next.getDate() + 1)
-                handleDateChange(next)
-              }}
-            >
-              →
-            </Button>
-          </div>
-
-          {slotsLoading ? (
-            <p className="text-sm text-muted-foreground">Cargando horarios...</p>
-          ) : slotsError ? (
-            <p className="text-sm text-destructive">{slotsError}</p>
-          ) : slots.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay horarios disponibles para este día.</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {slots.map((slot) => (
-                <button
-                  key={slot.start}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })
-                    setShowPaymentBrick(false)
-                  }}
-                  className={`rounded-md border p-2 text-center text-sm transition-colors ${
-                    selectedSlot?.start === slot.start
-                      ? "border-primary bg-primary/5"
-                      : "hover:border-primary/50"
-                  }`}
-                >
-                  {formatTimeLabel(slot.start, timezone)}
-                </button>
-              ))}
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-5">
+          {/* Service selection */}
+          <section className="rounded-xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 flex items-center gap-2">
+              <Stethoscope className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold">Elegí el servicio</h2>
             </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {products.map((product) => {
+                const selected = selectedProductId === product.productId
+                return (
+                  <button
+                    key={product.productId}
+                    type="button"
+                    onClick={() => handleProductSelect(product.productId)}
+                    className={`relative rounded-xl border p-4 text-left transition-all ${
+                      selected
+                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                        : "bg-background hover:border-primary/50 hover:shadow-sm"
+                    }`}
+                  >
+                    {selected && (
+                      <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                        <Check className="h-3 w-3" />
+                      </span>
+                    )}
+                    <p className="font-medium pr-6">{product.name}</p>
+                    <p className="text-sm text-muted-foreground">{product.procedureName}</p>
+                    <div className="mt-3 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">
+                        {product.durationMinutes} min
+                      </span>
+                      <span className="font-semibold text-primary">
+                        {formatAmount(product.amount, product.currencyId)}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* Professional selection */}
+          {selectedProduct && selectedProduct.professionalChoiceMode === "patient" && availableProfessionals.length > 0 && (
+            <section className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <User className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold">Elegí el profesional</h2>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {availableProfessionals.map((professional) => {
+                  const selected = selectedProfessionalId === professional.professionalId
+                  return (
+                    <button
+                      key={professional.professionalId}
+                      type="button"
+                      onClick={() => handleProfessionalSelect(professional.professionalId)}
+                      className={`rounded-full border px-4 py-2 text-sm font-medium transition-all ${
+                        selected
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "bg-background hover:border-primary/50 hover:bg-muted"
+                      }`}
+                    >
+                      {professional.surname}, {professional.name}
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Date & time */}
+          {selectedProduct && (selectedProduct.professionalChoiceMode !== "patient" || selectedProfessionalId !== null) && (
+            <section className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <CalendarDays className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold">Elegí el día y horario</h2>
+              </div>
+
+              <div className="mb-4 flex items-center justify-between rounded-lg border bg-background p-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const prev = new Date(selectedDate)
+                    prev.setDate(prev.getDate() - 1)
+                    handleDateChange(prev)
+                  }}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-semibold sm:text-base">
+                  {formatDateLabel(selectedDate, timezone)}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const next = new Date(selectedDate)
+                    next.setDate(next.getDate() + 1)
+                    handleDateChange(next)
+                  }}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {slotsLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Cargando horarios...
+                </div>
+              ) : slotsError ? (
+                <p className="py-4 text-sm text-destructive">{slotsError}</p>
+              ) : slots.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">
+                  No hay horarios disponibles para este día.
+                </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                  {slots.map((slot) => (
+                    <button
+                      key={slot.start}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })
+                        setShowPaymentBrick(false)
+                      }}
+                      className={`rounded-lg border py-2.5 text-center text-sm font-medium transition-all ${
+                        selectedSlot?.start === slot.start
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "bg-background hover:border-primary/50 hover:bg-muted"
+                      }`}
+                    >
+                      {formatTimeLabel(slot.start, timezone)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Patient data and payment */}
+          {selectedSlot && (
+            <section className="rounded-xl border bg-card p-5 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold">Tus datos y pago</h2>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="patient-name">Nombre</Label>
+                  <Input
+                    id="patient-name"
+                    value={patientName}
+                    onChange={(e) => setPatientName(e.target.value)}
+                    placeholder="Juan"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="patient-surname">Apellido</Label>
+                  <Input
+                    id="patient-surname"
+                    value={patientSurname}
+                    onChange={(e) => setPatientSurname(e.target.value)}
+                    placeholder="Pérez"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Label htmlFor="patient-phone">Teléfono</Label>
+                <Input
+                  id="patient-phone"
+                  value={patientPhone}
+                  onChange={(e) => setPatientPhone(e.target.value)}
+                  placeholder="+54 9 11 1234 5678"
+                />
+              </div>
+
+              {bookingError && (
+                <p className="mt-4 text-sm text-destructive">{bookingError}</p>
+              )}
+
+              {!showPaymentBrick ? (
+                <Button
+                  type="button"
+                  className="mt-5 w-full"
+                  size="lg"
+                  onClick={handleContinueToPayment}
+                >
+                  Continuar al pago
+                </Button>
+              ) : (
+                <div className="mt-5 space-y-3">
+                  {!mpSdkReady && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Cargando formulario de pago...
+                    </div>
+                  )}
+                  <div id="payment-brick-container" ref={paymentBrickContainerRef} />
+                  {bookingLoading && (
+                    <p className="text-sm text-muted-foreground">Procesando pago y reservando turno...</p>
+                  )}
+                </div>
+              )}
+            </section>
           )}
         </div>
-      )}
 
-      {selectedSlot && (
-        <div className="space-y-4 rounded-lg border p-4">
-          <h2 className="font-semibold">Tus datos</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="patient-name">Nombre</Label>
-              <Input
-                id="patient-name"
-                value={patientName}
-                onChange={(e) => setPatientName(e.target.value)}
-                placeholder="Juan"
-              />
+        {/* Summary sidebar */}
+        <aside className="h-fit rounded-xl border bg-card p-5 shadow-sm lg:sticky lg:top-6">
+          <h3 className="font-semibold">Resumen de tu reserva</h3>
+          <div className="mt-4 space-y-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Servicio</span>
+              <span className="font-medium text-right max-w-[60%]">
+                {selectedProduct?.name ?? "—"}
+              </span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="patient-surname">Apellido</Label>
-              <Input
-                id="patient-surname"
-                value={patientSurname}
-                onChange={(e) => setPatientSurname(e.target.value)}
-                placeholder="Pérez"
-              />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Profesional</span>
+              <span className="font-medium text-right max-w-[60%]">
+                {selectedProfessionalName ?? "—"}
+              </span>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="patient-phone">Teléfono</Label>
-            <Input
-              id="patient-phone"
-              value={patientPhone}
-              onChange={(e) => setPatientPhone(e.target.value)}
-              placeholder="+54 9 11 1234 5678"
-            />
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Día y hora</span>
+              <span className="font-medium text-right">
+                {selectedSlot
+                  ? `${formatDateLabel(new Date(selectedSlot.start), timezone)} · ${formatTimeLabel(selectedSlot.start, timezone)}`
+                  : "—"}
+              </span>
+            </div>
           </div>
 
           {pricing && (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">
-                  {paymentMode === "deposit" ? "Seña a pagar ahora" : "Total a pagar ahora"}
-                </span>
-                <span className="font-semibold">
-                  {formatAmount(pricing.totalToPay, selectedProduct!.currencyId)}
-                </span>
+            <>
+              <div className="my-4 h-px bg-border" />
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {paymentMode === "deposit" ? "Seña" : "Subtotal"}
+                  </span>
+                  <span>{formatAmount(pricing.baseAmount, selectedProduct!.currencyId)}</span>
+                </div>
+                {feePayer === "patient" && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Comisión ({feePercentage}%)</span>
+                    <span>{formatAmount(pricing.feeAmount, selectedProduct!.currencyId)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-base font-semibold">
+                  <span>Total a pagar</span>
+                  <span className="text-primary">
+                    {formatAmount(pricing.totalToPay, selectedProduct!.currencyId)}
+                  </span>
+                </div>
               </div>
-              {feePayer === "patient" && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Incluye comisión de pago del {feePercentage}%
-                </p>
-              )}
-            </div>
+            </>
           )}
-
-          {bookingError && <p className="text-sm text-destructive">{bookingError}</p>}
-
-          {!showPaymentBrick ? (
-            <Button type="button" className="w-full" onClick={handleContinueToPayment}>
-              Continuar al pago
-            </Button>
-          ) : (
-            <div className="space-y-3">
-              {!mpSdkReady && (
-                <p className="text-sm text-muted-foreground">Cargando formulario de pago...</p>
-              )}
-              <div id="payment-brick-container" ref={paymentBrickContainerRef} />
-              {bookingLoading && (
-                <p className="text-sm text-muted-foreground">Procesando pago y reservando turno...</p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+        </aside>
+      </div>
     </div>
   )
 }

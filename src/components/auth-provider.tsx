@@ -15,6 +15,7 @@ export interface PatientClinic {
   name: string
   logoUrl: string | null
   slug: string | null
+  status: "active" | "registration_required" | "pending_approval"
 }
 
 interface AuthContextValue {

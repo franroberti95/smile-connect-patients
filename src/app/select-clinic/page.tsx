@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,6 +8,7 @@ import { useAuth, type PatientClinic } from "@/components/auth-provider"
 import { api } from "@/lib/api"
 import { getIdToken } from "@/lib/firebase"
 import { toast } from "sonner"
+import { PatientRegistrationForm } from "@/components/patient-registration-form"
 
 interface ClinicsResponse {
   clinics: PatientClinic[]
@@ -19,6 +20,30 @@ export default function SelectClinicPage() {
   const [clinics, setClinics] = useState<PatientClinic[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSelecting, setIsSelecting] = useState<number | null>(null)
+  const [registeringClinic, setRegisteringClinic] = useState<PatientClinic | null>(null)
+
+  const loadClinics = useCallback(async (): Promise<PatientClinic[]> => {
+    if (!user) return []
+    try {
+      const idToken = await getIdToken()
+      if (!idToken) {
+        router.replace("/login")
+        return []
+      }
+
+      const response = await api<ClinicsResponse>("/api/public/patient/clinics", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      })
+      setClinics(response.clinics)
+      return response.clinics
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error.message || "No pudimos cargar tus clínicas.")
+      return []
+    } finally {
+      setIsLoading(false)
+    }
+  }, [router, user])
 
   useEffect(() => {
     if (loading) return
@@ -27,39 +52,51 @@ export default function SelectClinicPage() {
       return
     }
 
-    const loadClinics = async () => {
-      try {
-        const idToken = await getIdToken()
-        if (!idToken) {
-          router.replace("/login")
-          return
-        }
-
-        const response = await api<ClinicsResponse>("/api/public/patient/clinics", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        })
-        setClinics(response.clinics)
-      } catch (error: any) {
-        console.error(error)
-        toast.error(error.message || "No pudimos cargar tus clínicas.")
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     void loadClinics()
-  }, [loading, router, user])
+  }, [loading, router, user, loadClinics])
 
   const handleSelect = (clinic: PatientClinic) => {
+    if (clinic.status === "registration_required") {
+      setRegisteringClinic(clinic)
+      return
+    }
+
     setIsSelecting(clinic.clinicId)
     selectClinic(clinic)
     router.push("/dashboard")
+  }
+
+  const handleRegistered = async () => {
+    if (!registeringClinic) return
+
+    setIsLoading(true)
+    setRegisteringClinic(null)
+    const refreshedClinics = await loadClinics()
+
+    const refreshedClinic = refreshedClinics.find((c) => c.clinicId === registeringClinic.clinicId)
+    if (refreshedClinic?.status === "active") {
+      selectClinic(refreshedClinic)
+      router.push("/dashboard")
+    }
   }
 
   if (loading || isLoading) {
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      </main>
+    )
+  }
+
+  if (registeringClinic && user?.email) {
+    return (
+      <main className="flex flex-1 items-center justify-center bg-gradient-to-br from-sky-50 via-white to-teal-50 p-6 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+        <PatientRegistrationForm
+          clinic={registeringClinic}
+          userEmail={user.email}
+          onRegistered={handleRegistered}
+          onCancel={() => setRegisteringClinic(null)}
+        />
       </main>
     )
   }
@@ -97,9 +134,16 @@ export default function SelectClinicPage() {
                     clinic.name.slice(0, 1).toUpperCase()
                   )}
                 </div>
-                <span className="flex-1 font-medium">{clinic.name}</span>
+                <div className="flex-1">
+                  <p className="font-medium">{clinic.name}</p>
+                  {clinic.status === "registration_required" && (
+                    <p className="text-xs text-muted-foreground">Completar datos para acceder</p>
+                  )}
+                </div>
                 {isSelecting === clinic.clinicId ? (
                   <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : clinic.status === "registration_required" ? (
+                  <span className="text-sm font-medium text-primary">Registrarme</span>
                 ) : (
                   <span className="text-sm text-muted-foreground">Ingresar</span>
                 )}
