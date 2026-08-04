@@ -46,6 +46,7 @@ interface BookingFlowProps {
   depositPercentage?: number
   feePayer: "clinic" | "patient"
   feePercentage: number
+  advanceBookingDays: number
   mpPublicKey: string
 }
 
@@ -111,6 +112,17 @@ function toTimezoneDateString(date: Date, timezone: string): string {
   return formatter.format(date)
 }
 
+function getMinSelectableDate(timezone: string, advanceDays: number): Date {
+  const todayInTz = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  }).format(new Date())
+  const [year, month, day] = todayInTz.split("-").map(Number)
+  return new Date(year, month - 1, day + advanceDays)
+}
+
 export function BookingFlow({
   slug,
   products,
@@ -120,6 +132,7 @@ export function BookingFlow({
   depositPercentage,
   feePayer,
   feePercentage,
+  advanceBookingDays,
   mpPublicKey,
 }: BookingFlowProps) {
   const { user } = useAuth()
@@ -128,6 +141,7 @@ export function BookingFlow({
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    today.setDate(today.getDate() + advanceBookingDays)
     return today
   })
   const [slots, setSlots] = useState<Array<{ start: string; end: string; professionalId: number; professionalName: string; professionalSurname: string }>>([])
@@ -145,6 +159,9 @@ export function BookingFlow({
   const [mpSdkReady, setMpSdkReady] = useState(false)
   const paymentBrickContainerRef = useRef<HTMLDivElement>(null)
   const paymentBrickControllerRef = useRef<{ unmount: () => void } | null>(null)
+
+  type StepId = "service" | "professional" | "datetime" | "payment"
+  const [currentStep, setCurrentStep] = useState<StepId>("service")
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.productId === selectedProductId),
@@ -176,6 +193,8 @@ export function BookingFlow({
     const totalToPay = feePayer === "patient" ? Math.round((baseAmount + feeAmount) * 100) / 100 : baseAmount
     return { baseAmount, feeAmount, totalToPay }
   }, [selectedProduct, paymentMode, depositPercentage, feePayer, feePercentage])
+
+  const stepRequiresProfessional = selectedProduct?.professionalChoiceMode === "patient"
 
   useEffect(() => {
     if (window.MercadoPago) {
@@ -258,6 +277,7 @@ export function BookingFlow({
   }
 
   const handleProductSelect = (productId: number) => {
+    const product = products.find((p) => p.productId === productId)
     setSelectedProductId(productId)
     setSelectedProfessionalId(null)
     setSelectedSlot(null)
@@ -265,6 +285,11 @@ export function BookingFlow({
     setBookingSuccess(false)
     setBookingError(null)
     setShowPaymentBrick(false)
+    if (product?.professionalChoiceMode === "patient") {
+      setCurrentStep("professional")
+    } else {
+      setCurrentStep("datetime")
+    }
   }
 
   useEffect(() => {
@@ -278,6 +303,9 @@ export function BookingFlow({
     setSelectedSlot(null)
     if (selectedProduct) {
       loadSlots(selectedDate, selectedProduct, professionalId ?? undefined)
+    }
+    if (professionalId !== null) {
+      setCurrentStep("datetime")
     }
   }
 
@@ -356,15 +384,15 @@ export function BookingFlow({
 
   const steps = useMemo(() => {
     const base = [
-      { id: "service", label: "Servicio", done: !!selectedProduct, active: true },
-      ...(selectedProduct?.professionalChoiceMode === "patient"
-        ? [{ id: "professional", label: "Profesional", done: !!selectedProfessionalId, active: !!selectedProduct }]
+      { id: "service", label: "Servicio", done: !!selectedProduct, active: currentStep === "service" },
+      ...(stepRequiresProfessional
+        ? [{ id: "professional", label: "Profesional", done: !!selectedProfessionalId, active: currentStep === "professional" }]
         : []),
-      { id: "datetime", label: "Día y hora", done: !!selectedSlot, active: !!selectedProduct },
-      { id: "payment", label: "Pago", done: bookingSuccess, active: !!selectedSlot },
+      { id: "datetime", label: "Día y hora", done: !!selectedSlot, active: currentStep === "datetime" },
+      { id: "payment", label: "Pago", done: bookingSuccess, active: currentStep === "payment" },
     ]
     return base
-  }, [selectedProduct, selectedProfessionalId, selectedSlot, bookingSuccess])
+  }, [selectedProduct, selectedProfessionalId, selectedSlot, bookingSuccess, currentStep, stepRequiresProfessional])
 
   if (bookingSuccess) {
     return (
@@ -415,6 +443,16 @@ export function BookingFlow({
     return professional ? `${professional.surname}, ${professional.name}` : null
   }, [selectedProduct, selectedProfessionalId, professionals])
 
+  const minSelectableDate = useMemo(() => getMinSelectableDate(timezone, advanceBookingDays), [timezone, advanceBookingDays])
+  const minSelectableDateString = useMemo(
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(minSelectableDate),
+    [minSelectableDate, timezone]
+  )
+  const selectedDateString = useMemo(
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(selectedDate),
+    [selectedDate, timezone]
+  )
+
   return (
     <div className="flex flex-col gap-6">
       {/* Stepper */}
@@ -455,6 +493,7 @@ export function BookingFlow({
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-5">
           {/* Service selection */}
+          {currentStep === "service" && (
           <section className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="mb-4 flex items-center gap-2">
               <Stethoscope className="h-4 w-4 text-primary" />
@@ -494,13 +533,24 @@ export function BookingFlow({
               })}
             </div>
           </section>
+          )}
 
           {/* Professional selection */}
-          {selectedProduct && selectedProduct.professionalChoiceMode === "patient" && availableProfessionals.length > 0 && (
+          {currentStep === "professional" && selectedProduct && selectedProduct.professionalChoiceMode === "patient" && availableProfessionals.length > 0 && (
             <section className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <User className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold">Elegí el profesional</h2>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  <h2 className="font-semibold">Elegí el profesional</h2>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentStep("service")}
+                >
+                  Volver
+                </Button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {availableProfessionals.map((professional) => {
@@ -525,11 +575,21 @@ export function BookingFlow({
           )}
 
           {/* Date & time */}
-          {selectedProduct && (selectedProduct.professionalChoiceMode !== "patient" || selectedProfessionalId !== null) && (
+          {currentStep === "datetime" && selectedProduct && (selectedProduct.professionalChoiceMode !== "patient" || selectedProfessionalId !== null) && (
             <section className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <CalendarDays className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold">Elegí el día y horario</h2>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="h-4 w-4 text-primary" />
+                  <h2 className="font-semibold">Elegí el día y horario</h2>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentStep(stepRequiresProfessional ? "professional" : "service")}
+                >
+                  Volver
+                </Button>
               </div>
 
               <div className="mb-4 flex items-center justify-between rounded-lg border bg-background p-2">
@@ -537,7 +597,9 @@ export function BookingFlow({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  disabled={selectedDateString <= minSelectableDateString}
                   onClick={() => {
+                    if (selectedDateString <= minSelectableDateString) return
                     const prev = new Date(selectedDate)
                     prev.setDate(prev.getDate() - 1)
                     handleDateChange(prev)
@@ -582,6 +644,7 @@ export function BookingFlow({
                       onClick={() => {
                         setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })
                         setShowPaymentBrick(false)
+                        setCurrentStep("payment")
                       }}
                       className={`rounded-lg border py-2.5 text-center text-sm font-medium transition-all ${
                         selectedSlot?.start === slot.start
@@ -598,11 +661,21 @@ export function BookingFlow({
           )}
 
           {/* Patient data and payment */}
-          {selectedSlot && (
+          {currentStep === "payment" && selectedSlot && (
             <section className="rounded-xl border bg-card p-5 shadow-sm">
-              <div className="mb-4 flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold">Tus datos y pago</h2>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-primary" />
+                  <h2 className="font-semibold">Tus datos y pago</h2>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCurrentStep("datetime")}
+                >
+                  Volver
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

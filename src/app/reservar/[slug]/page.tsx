@@ -19,6 +19,7 @@ interface ClinicBySlugResponse {
     cancellationPolicy?: string
     feePayer?: "clinic" | "patient"
     feePercentage?: number
+    advanceBookingDays?: number
     mpPublicKey?: string | null
     products: BookableProduct[]
   }
@@ -89,6 +90,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
               depositPercentage={clinic.booking.depositPercentage}
               feePayer={clinic.booking.feePayer ?? "clinic"}
               feePercentage={clinic.booking.feePercentage ?? 3}
+              advanceBookingDays={clinic.booking.advanceBookingDays ?? 1}
               mpPublicKey={clinic.booking.mpPublicKey}
             />
           ) : (
