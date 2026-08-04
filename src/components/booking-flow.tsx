@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import {
   CalendarDays,
   Check,
@@ -163,8 +164,13 @@ export function BookingFlow({
   const [bookingPending, setBookingPending] = useState(false)
   const [showPaymentBrick, setShowPaymentBrick] = useState(false)
   const [mpSdkReady, setMpSdkReady] = useState(false)
+  const [preferenceId, setPreferenceId] = useState<string | null>(null)
+  const [preferenceLoading, setPreferenceLoading] = useState(false)
+  const [confirmingRedirectPayment, setConfirmingRedirectPayment] = useState(false)
+  const [redirectPaymentError, setRedirectPaymentError] = useState<string | null>(null)
   const paymentBrickContainerRef = useRef<HTMLDivElement>(null)
   const paymentBrickControllerRef = useRef<{ unmount: () => void } | null>(null)
+  const searchParams = useSearchParams()
 
   type StepId = "service" | "professional" | "datetime" | "payment"
   const [currentStep, setCurrentStep] = useState<StepId>("service")
@@ -250,7 +256,7 @@ export function BookingFlow({
   }, [user, slug])
 
   useEffect(() => {
-    if (!showPaymentBrick || !mpSdkReady || !pricing || !user?.email) return
+    if (!showPaymentBrick || !mpSdkReady || !pricing || !user?.email || !preferenceId) return
     if (!window.MercadoPago || !paymentBrickContainerRef.current) return
 
     let cancelled = false
@@ -260,12 +266,14 @@ export function BookingFlow({
       .create("payment", "payment-brick-container", {
         initialization: {
           amount: pricing.totalToPay,
+          preferenceId,
           payer: { email: user.email, entityType: "individual" },
         },
         customization: {
           paymentMethods: {
             creditCard: "all",
             debitCard: "all",
+            bankTransfer: "all",
             mercadoPago: "all",
           },
         },
