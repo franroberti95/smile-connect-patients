@@ -1,13 +1,12 @@
 "use client"
 
-import { useState, useMemo, useEffect, useRef } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import {
   CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
-  Clock,
   CreditCard,
   Stethoscope,
   User,
@@ -48,29 +47,6 @@ interface BookingFlowProps {
   feePayer: "clinic" | "patient"
   feePercentage: number
   advanceBookingDays: number
-  mpPublicKey: string
-}
-
-declare global {
-  interface Window {
-    MercadoPago?: new (publicKey: string, options?: Record<string, unknown>) => {
-      bricks: () => {
-        create: (
-          brickType: string,
-          containerId: string,
-          settings: Record<string, unknown>
-        ) => Promise<{ unmount: () => void }>
-      }
-    }
-  }
-}
-
-interface PaymentBrickFormData {
-  token?: string
-  payment_method_id: string
-  issuer_id?: string
-  installments?: number
-  payer?: { email?: string }
 }
 
 const currencyCodeById: Record<number, string> = {
@@ -134,7 +110,6 @@ export function BookingFlow({
   feePayer,
   feePercentage,
   advanceBookingDays,
-  mpPublicKey,
 }: BookingFlowProps) {
   const { user } = useAuth()
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
@@ -158,18 +133,11 @@ export function BookingFlow({
     phoneNumber: string | null
   } | null>(null)
   const [existingPatientLoading, setExistingPatientLoading] = useState(true)
-  const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
-  const [bookingPending, setBookingPending] = useState(false)
-  const [showPaymentBrick, setShowPaymentBrick] = useState(false)
-  const [mpSdkReady, setMpSdkReady] = useState(false)
-  const [preferenceId, setPreferenceId] = useState<string | null>(null)
   const [preferenceLoading, setPreferenceLoading] = useState(false)
   const [confirmingRedirectPayment, setConfirmingRedirectPayment] = useState(false)
   const [redirectPaymentError, setRedirectPaymentError] = useState<string | null>(null)
-  const paymentBrickContainerRef = useRef<HTMLDivElement>(null)
-  const paymentBrickControllerRef = useRef<{ unmount: () => void } | null>(null)
   const searchParams = useSearchParams()
 
   type StepId = "service" | "professional" | "datetime" | "payment"
@@ -209,18 +177,6 @@ export function BookingFlow({
   const stepRequiresProfessional = selectedProduct?.professionalChoiceMode === "patient"
 
   useEffect(() => {
-    if (window.MercadoPago) {
-      setMpSdkReady(true)
-      return
-    }
-    const script = document.createElement("script")
-    script.src = "https://sdk.mercadopago.com/js/v2"
-    script.async = true
-    script.onload = () => setMpSdkReady(true)
-    document.body.appendChild(script)
-  }, [])
-
-  useEffect(() => {
     if (!user) {
       setExistingPatientLoading(false)
       return
@@ -256,52 +212,67 @@ export function BookingFlow({
   }, [user, slug])
 
   useEffect(() => {
-    if (!showPaymentBrick || !mpSdkReady || !pricing || !user?.email || !preferenceId) return
-    if (!window.MercadoPago || !paymentBrickContainerRef.current) return
+    const paymentRef = searchParams.get("paymentRef")
+    if (!paymentRef) return
+
+    if (searchParams.get("failed") === "1") {
+      setRedirectPaymentError("El pago no pudo completarse. Podés intentar de nuevo.")
+      return
+    }
 
     let cancelled = false
-    const mp = new window.MercadoPago(mpPublicKey, { locale: "es-AR" })
+    let attempts = 0
+    const maxAttempts = 30
 
-    mp.bricks()
-      .create("payment", "payment-brick-container", {
-        initialization: {
-          amount: pricing.totalToPay,
-          preferenceId,
-          payer: { email: user.email, entityType: "individual" },
-        },
-        customization: {
-          paymentMethods: {
-            creditCard: "all",
-            debitCard: "all",
-            bankTransfer: "all",
-            mercadoPago: "all",
-          },
-        },
-        callbacks: {
-          onReady: () => {},
-          onError: (error: unknown) => {
-            console.error("Payment brick error", error)
-            setBookingError("No pudimos cargar el formulario de pago")
-          },
-          onSubmit: ({ formData }: { formData: PaymentBrickFormData }) =>
-            handleBook(formData),
-        },
-      })
-      .then((controller) => {
-        if (cancelled) {
-          controller.unmount()
+    setConfirmingRedirectPayment(true)
+
+    const poll = async () => {
+      try {
+        const data = await api<{ status: string; appointmentId: number | null }>(
+          `/api/public/appointments/preference-status?ref=${encodeURIComponent(paymentRef)}`
+        )
+        if (cancelled) return
+
+        if (data.appointmentId) {
+          setConfirmingRedirectPayment(false)
+          setBookingSuccess(true)
           return
         }
-        paymentBrickControllerRef.current = controller
-      })
+
+        if (["rejected", "cancelled", "refunded", "charged_back"].includes(data.status)) {
+          setConfirmingRedirectPayment(false)
+          setRedirectPaymentError("El pago no pudo completarse. Podés intentar de nuevo.")
+          return
+        }
+
+        attempts += 1
+        if (attempts >= maxAttempts) {
+          setConfirmingRedirectPayment(false)
+          setRedirectPaymentError(
+            "Estamos confirmando tu pago, puede demorar unos minutos. Te avisaremos por correo o WhatsApp."
+          )
+          return
+        }
+
+        setTimeout(poll, 2000)
+      } catch {
+        if (cancelled) return
+        attempts += 1
+        if (attempts >= maxAttempts) {
+          setConfirmingRedirectPayment(false)
+          setRedirectPaymentError("No pudimos confirmar tu pago. Contactá a la clínica si el problema persiste.")
+          return
+        }
+        setTimeout(poll, 2000)
+      }
+    }
+
+    poll()
 
     return () => {
       cancelled = true
-      paymentBrickControllerRef.current?.unmount()
-      paymentBrickControllerRef.current = null
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPaymentBrick, mpSdkReady, pricing?.totalToPay, user?.email])
+  }, [searchParams])
 
   const loadSlots = async (date: Date, product: BookableProduct, professionalId?: number) => {
     setSlotsLoading(true)
@@ -333,7 +304,6 @@ export function BookingFlow({
     setSlots([])
     setBookingSuccess(false)
     setBookingError(null)
-    setShowPaymentBrick(false)
     if (product?.professionalChoiceMode === "patient") {
       setCurrentStep("professional")
     } else {
@@ -366,23 +336,19 @@ export function BookingFlow({
     }
   }
 
-  const handleContinueToPayment = () => {
+  const handleContinueToPayment = async () => {
     if (!existingPatient && (!patientName.trim() || !patientSurname.trim())) {
       setBookingError("Completá nombre y apellido")
       return
     }
-    setBookingError(null)
-    setShowPaymentBrick(true)
-  }
-
-  const handleBook = async (formData: PaymentBrickFormData) => {
     if (!selectedProduct || !selectedSlot || !user) return
-    setBookingLoading(true)
+
     setBookingError(null)
+    setPreferenceLoading(true)
     try {
       const idToken = await user.getIdToken()
-      const result = await api<{ paymentStatus?: string }>(
-        "/api/public/appointments",
+      const data = await api<{ preferenceId: string; initPoint: string }>(
+        "/api/public/appointments/preference",
         {
           method: "POST",
           headers: { Authorization: `Bearer ${idToken}` },
@@ -397,38 +363,25 @@ export function BookingFlow({
               email: user.email,
               phoneNumber: patientPhone.trim(),
             },
-            payment: {
-              token: formData.token,
-              paymentMethodId: formData.payment_method_id,
-              issuerId: formData.issuer_id,
-              installments: formData.installments,
-            },
           },
         }
       )
-      if (result.paymentStatus === "in_process" || result.paymentStatus === "pending") {
-        setBookingPending(true)
-      } else {
-        setBookingSuccess(true)
-      }
+      window.location.href = data.initPoint
     } catch (error) {
-      setBookingError(error instanceof ApiError ? error.message : "No pudimos procesar el pago")
-      setShowPaymentBrick(false)
-      throw error
-    } finally {
-      setBookingLoading(false)
+      setBookingError(error instanceof ApiError ? error.message : "No pudimos preparar el pago")
+      setPreferenceLoading(false)
     }
   }
 
   const handleReset = () => {
     setBookingSuccess(false)
-    setBookingPending(false)
     setSelectedProductId(null)
     setSelectedProfessionalId(null)
     setSelectedSlot(null)
     setSlots([])
-    setShowPaymentBrick(false)
     setBookingError(null)
+    setRedirectPaymentError(null)
+    setConfirmingRedirectPayment(false)
   }
 
   const steps = useMemo(() => {
@@ -442,6 +395,37 @@ export function BookingFlow({
     ]
     return base
   }, [selectedProduct, selectedProfessionalId, selectedSlot, bookingSuccess, currentStep, stepRequiresProfessional])
+
+  if (confirmingRedirectPayment) {
+    return (
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="p-8 text-center space-y-4">
+          <span className="mx-auto inline-block h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <div>
+            <p className="text-lg font-semibold">Confirmando tu pago...</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              No cierres esta página, esto puede tardar unos segundos.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (redirectPaymentError) {
+    return (
+      <Card className="border-destructive/30 bg-destructive/5">
+        <CardContent className="p-8 text-center space-y-4">
+          <div>
+            <p className="text-lg font-semibold">{redirectPaymentError}</p>
+          </div>
+          <Button type="button" variant="outline" onClick={handleReset}>
+            Volver al inicio
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (bookingSuccess) {
     return (
@@ -458,27 +442,6 @@ export function BookingFlow({
           </div>
           <Button type="button" variant="outline" onClick={handleReset}>
             Reservar otro turno
-          </Button>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (bookingPending) {
-    return (
-      <Card className="border-primary/30 bg-primary/5">
-        <CardContent className="p-8 text-center space-y-4">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Clock className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <p className="text-lg font-semibold">Estamos confirmando tu pago</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tu turno quedará reservado apenas se confirme el pago. Te avisaremos por correo o WhatsApp.
-            </p>
-          </div>
-          <Button type="button" variant="outline" onClick={handleReset}>
-            Volver al inicio
           </Button>
         </CardContent>
       </Card>
@@ -692,7 +655,6 @@ export function BookingFlow({
                       type="button"
                       onClick={() => {
                         setSelectedSlot({ start: slot.start, end: slot.end, professionalId: slot.professionalId })
-                        setShowPaymentBrick(false)
                         setCurrentStep("payment")
                       }}
                       className={`rounded-lg border py-2.5 text-center text-sm font-medium transition-all ${
@@ -777,29 +739,15 @@ export function BookingFlow({
                 <p className="mt-4 text-sm text-destructive">{bookingError}</p>
               )}
 
-              {!showPaymentBrick ? (
-                <Button
-                  type="button"
-                  className="mt-5 w-full"
-                  size="lg"
-                  onClick={handleContinueToPayment}
-                >
-                  Continuar al pago
-                </Button>
-              ) : (
-                <div className="mt-5 space-y-3">
-                  {!mpSdkReady && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Cargando formulario de pago...
-                    </div>
-                  )}
-                  <div id="payment-brick-container" ref={paymentBrickContainerRef} />
-                  {bookingLoading && (
-                    <p className="text-sm text-muted-foreground">Procesando pago y reservando turno...</p>
-                  )}
-                </div>
-              )}
+              <Button
+                type="button"
+                className="mt-5 w-full"
+                size="lg"
+                disabled={preferenceLoading}
+                onClick={handleContinueToPayment}
+              >
+                {preferenceLoading ? "Redirigiendo a Mercado Pago..." : "Continuar al pago"}
+              </Button>
             </section>
           )}
         </div>

@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import { api } from "@/lib/api"
 import { BookingFlow, type BookableProduct, type ClinicProfessional } from "@/components/booking-flow"
@@ -81,18 +82,19 @@ export default async function BookingPage({ params }: BookingPageProps) {
       <div className="flex flex-1 flex-col px-4 py-6 sm:px-6">
         <div className="mx-auto w-full max-w-3xl">
           {clinic.booking.products.length > 0 ? (
-            <BookingFlow
-              slug={clinic.slug}
-              products={clinic.booking.products}
-              professionals={clinic.professionals}
-              timezone={clinic.timezone}
-              paymentMode={clinic.booking.paymentMode ?? "full"}
-              depositPercentage={clinic.booking.depositPercentage}
-              feePayer={clinic.booking.feePayer ?? "clinic"}
-              feePercentage={clinic.booking.feePercentage ?? 3}
-              advanceBookingDays={clinic.booking.advanceBookingDays ?? 1}
-              mpPublicKey={clinic.booking.mpPublicKey}
-            />
+            <Suspense fallback={null}>
+              <BookingFlow
+                slug={clinic.slug}
+                products={clinic.booking.products}
+                professionals={clinic.professionals}
+                timezone={clinic.timezone}
+                paymentMode={clinic.booking.paymentMode ?? "full"}
+                depositPercentage={clinic.booking.depositPercentage}
+                feePayer={clinic.booking.feePayer ?? "clinic"}
+                feePercentage={clinic.booking.feePercentage ?? 3}
+                advanceBookingDays={clinic.booking.advanceBookingDays ?? 1}
+              />
+            </Suspense>
           ) : (
             <div className="rounded-xl border bg-background p-8 text-center shadow-sm">
               <p className="text-sm text-muted-foreground">
