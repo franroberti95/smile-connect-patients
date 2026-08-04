@@ -151,6 +151,12 @@ export function BookingFlow({
   const [patientName, setPatientName] = useState("")
   const [patientSurname, setPatientSurname] = useState("")
   const [patientPhone, setPatientPhone] = useState("")
+  const [existingPatient, setExistingPatient] = useState<{
+    name: string
+    surname: string
+    phoneNumber: string | null
+  } | null>(null)
+  const [existingPatientLoading, setExistingPatientLoading] = useState(true)
   const [bookingLoading, setBookingLoading] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
@@ -207,6 +213,41 @@ export function BookingFlow({
     script.onload = () => setMpSdkReady(true)
     document.body.appendChild(script)
   }, [])
+
+  useEffect(() => {
+    if (!user) {
+      setExistingPatientLoading(false)
+      return
+    }
+    let cancelled = false
+    setExistingPatientLoading(true)
+    user
+      .getIdToken()
+      .then((idToken) =>
+        api<{ patient: { name: string; surname: string; phoneNumber: string | null } | null }>(
+          `/api/public/patient/me?slug=${encodeURIComponent(slug)}`,
+          { headers: { Authorization: `Bearer ${idToken}` } }
+        )
+      )
+      .then((data) => {
+        if (cancelled) return
+        setExistingPatient(data.patient)
+        if (data.patient) {
+          setPatientName(data.patient.name)
+          setPatientSurname(data.patient.surname)
+          setPatientPhone(data.patient.phoneNumber || "")
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setExistingPatient(null)
+      })
+      .finally(() => {
+        if (!cancelled) setExistingPatientLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user, slug])
 
   useEffect(() => {
     if (!showPaymentBrick || !mpSdkReady || !pricing || !user?.email) return
@@ -318,7 +359,7 @@ export function BookingFlow({
   }
 
   const handleContinueToPayment = () => {
-    if (!patientName.trim() || !patientSurname.trim()) {
+    if (!existingPatient && (!patientName.trim() || !patientSurname.trim())) {
       setBookingError("Completá nombre y apellido")
       return
     }
@@ -678,35 +719,51 @@ export function BookingFlow({
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="patient-name">Nombre</Label>
-                  <Input
-                    id="patient-name"
-                    value={patientName}
-                    onChange={(e) => setPatientName(e.target.value)}
-                    placeholder="Juan"
-                  />
+              {existingPatientLoading ? (
+                <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Cargando tus datos...
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="patient-surname">Apellido</Label>
-                  <Input
-                    id="patient-surname"
-                    value={patientSurname}
-                    onChange={(e) => setPatientSurname(e.target.value)}
-                    placeholder="Pérez"
-                  />
+              ) : existingPatient ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+                  <User className="h-4 w-4 text-primary" />
+                  <span>
+                    Reservando como <strong>{existingPatient.name} {existingPatient.surname}</strong>
+                  </span>
                 </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                <Label htmlFor="patient-phone">Teléfono</Label>
-                <Input
-                  id="patient-phone"
-                  value={patientPhone}
-                  onChange={(e) => setPatientPhone(e.target.value)}
-                  placeholder="+54 9 11 1234 5678"
-                />
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="patient-name">Nombre</Label>
+                      <Input
+                        id="patient-name"
+                        value={patientName}
+                        onChange={(e) => setPatientName(e.target.value)}
+                        placeholder="Juan"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="patient-surname">Apellido</Label>
+                      <Input
+                        id="patient-surname"
+                        value={patientSurname}
+                        onChange={(e) => setPatientSurname(e.target.value)}
+                        placeholder="Pérez"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <Label htmlFor="patient-phone">Teléfono</Label>
+                    <Input
+                      id="patient-phone"
+                      value={patientPhone}
+                      onChange={(e) => setPatientPhone(e.target.value)}
+                      placeholder="+54 9 11 1234 5678"
+                    />
+                  </div>
+                </>
+              )}
 
               {bookingError && (
                 <p className="mt-4 text-sm text-destructive">{bookingError}</p>
