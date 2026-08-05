@@ -157,6 +157,23 @@ export function BookingFlow({
     return professionals.filter((p) => ids.includes(p.professionalId))
   }, [selectedProduct, professionals])
 
+  const selectedProfessionalName = useMemo(() => {
+    if (!selectedProduct) return null
+    if (selectedProduct.professionalChoiceMode !== "patient") return "Automático"
+    const professional = professionals.find((p) => p.professionalId === selectedProfessionalId)
+    return professional ? `${professional.surname}, ${professional.name}` : null
+  }, [selectedProduct, selectedProfessionalId, professionals])
+
+  const minSelectableDate = useMemo(() => getMinSelectableDate(timezone, advanceBookingDays), [timezone, advanceBookingDays])
+  const minSelectableDateString = useMemo(
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(minSelectableDate),
+    [minSelectableDate, timezone]
+  )
+  const selectedDateString = useMemo(
+    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(selectedDate),
+    [selectedDate, timezone]
+  )
+
   const formatAmount = (amount: number, currencyId: number) =>
     new Intl.NumberFormat("es-AR", {
       style: "currency",
@@ -447,23 +464,6 @@ export function BookingFlow({
       </Card>
     )
   }
-
-  const selectedProfessionalName = useMemo(() => {
-    if (!selectedProduct) return null
-    if (selectedProduct.professionalChoiceMode !== "patient") return "Automático"
-    const professional = professionals.find((p) => p.professionalId === selectedProfessionalId)
-    return professional ? `${professional.surname}, ${professional.name}` : null
-  }, [selectedProduct, selectedProfessionalId, professionals])
-
-  const minSelectableDate = useMemo(() => getMinSelectableDate(timezone, advanceBookingDays), [timezone, advanceBookingDays])
-  const minSelectableDateString = useMemo(
-    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(minSelectableDate),
-    [minSelectableDate, timezone]
-  )
-  const selectedDateString = useMemo(
-    () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(selectedDate),
-    [selectedDate, timezone]
-  )
 
   return (
     <div className="flex flex-col gap-6">
