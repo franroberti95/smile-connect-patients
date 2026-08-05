@@ -13,7 +13,6 @@ interface ClinicBySlugResponse {
   professionals: ClinicProfessional[]
   booking: {
     enabled: boolean
-    appointmentPrice?: number
     paymentMode?: "full" | "deposit"
     depositPercentage?: number
     bookingConfirmationMessage?: string
