@@ -56,7 +56,7 @@ export default async function BookingPage({ params }: BookingPageProps) {
     )
   }
 
-  if (!clinic.booking.mpPublicKey) {
+  if (!clinic.booking.mpPublicKey && process.env.NEXT_PUBLIC_MOCK_PAYMENT !== "true") {
     return (
       <main className="flex flex-1 flex-col items-center justify-center p-6">
         <div className="w-full max-w-lg rounded-xl border bg-background p-8 text-center shadow-sm">

@@ -385,20 +385,15 @@ export function BookingFlow({
       )
 
       if (process.env.NEXT_PUBLIC_MOCK_PAYMENT === "true") {
-        // Mock mode: simulate approved payment by calling the webhook
-        const mockPaymentId = `mock_${Date.now()}`
         const apiBaseUrl = process.env.NEXT_PUBLIC_SMILE_CONNECT_API_URL
-        await fetch(`${apiBaseUrl}/api/public/webhooks/mercadopago-booking?mock=true`, {
+        await fetch(`${apiBaseUrl}/api/public/webhooks/mercadopago-booking`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            type: "payment",
-            data: { id: mockPaymentId },
             _mock: true,
             _externalReference: data.externalReference,
           }),
         })
-        // Redirect to same page with paymentRef so the polling picks it up
         window.location.href = `/reservar/${slug}?paymentRef=${data.externalReference}`
       } else {
         window.location.href = data.initPoint
@@ -800,21 +795,9 @@ export function BookingFlow({
           {pricing && (
             <>
               <div className="my-4 h-px bg-border" />
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    {paymentMode === "deposit" ? "Seña" : "Subtotal"}
-                  </span>
-                  <span>{formatAmount(pricing.baseAmount, selectedProduct!.currencyId)}</span>
-                </div>
-                {feePayer === "patient" && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Comisión ({feePercentage}%)</span>
-                    <span>{formatAmount(pricing.feeAmount, selectedProduct!.currencyId)}</span>
-                  </div>
-                )}
+              <div className="text-sm">
                 <div className="flex justify-between text-base font-semibold">
-                  <span>Total a pagar</span>
+                  <span>{paymentMode === "deposit" ? "Seña a pagar" : "Total a pagar"}</span>
                   <span className="text-primary">
                     {formatAmount(pricing.totalToPay, selectedProduct!.currencyId)}
                   </span>
