@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,9 +8,62 @@ import { useAuth, type PatientClinic } from "@/components/auth-provider"
 import { api } from "@/lib/api"
 import { getIdToken } from "@/lib/firebase"
 
+interface PatientAppointment {
+  appointmentId: number
+  startDate: string
+  endDate: string
+  professionalName: string | null
+  boxName: string | null
+  clinicName: string
+}
+
+interface PendingReservation {
+  externalReference: string
+  startDate: string
+  endDate: string
+  initPoint: string | null
+  expiresAt: string
+  clinicName: string
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+}
+
+function CountdownTimer({ expiresAt }: { expiresAt: string }) {
+  const [remaining, setRemaining] = useState("")
+
+  useEffect(() => {
+    const update = () => {
+      const diff = new Date(expiresAt).getTime() - Date.now()
+      if (diff <= 0) {
+        setRemaining("Expirada")
+        return
+      }
+      const mins = Math.floor(diff / 60_000)
+      const secs = Math.floor((diff % 60_000) / 1000)
+      setRemaining(`${mins}:${secs.toString().padStart(2, "0")}`)
+    }
+    update()
+    const interval = setInterval(update, 1000)
+    return () => clearInterval(interval)
+  }, [expiresAt])
+
+  return <span className="text-xs font-mono text-amber-600">{remaining}</span>
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const { user, loading, selectedClinic, selectClinic, logout } = useAuth()
+  const [appointments, setAppointments] = useState<PatientAppointment[]>([])
+  const [pendingReservations, setPendingReservations] = useState<PendingReservation[]>([])
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -54,6 +107,36 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClinic?.clinicId])
 
+  // Fetch patient appointments and pending reservations
+  const fetchAppointments = useCallback(async () => {
+    if (!selectedClinic?.slug) return
+    try {
+      const idToken = await getIdToken()
+      if (!idToken) return
+
+      const response = await api<{
+        appointments: PatientAppointment[]
+        pendingReservations: PendingReservation[]
+        reservationMinutes: number
+      }>(`/api/public/patient/appointments?slug=${selectedClinic.slug}`, {
+        headers: { Authorization: `Bearer ${idToken}` },
+      })
+
+      setAppointments(response.appointments || [])
+      setPendingReservations(response.pendingReservations || [])
+    } catch {
+      // Silently fail — show empty state
+    } finally {
+      setAppointmentsLoading(false)
+    }
+  }, [selectedClinic?.slug])
+
+  useEffect(() => {
+    if (!loading && user && selectedClinic?.status === "active") {
+      fetchAppointments()
+    }
+  }, [loading, user, selectedClinic, fetchAppointments])
+
   if (loading) {
     return (
       <main className="flex flex-1 items-center justify-center p-6">
@@ -68,6 +151,8 @@ export default function DashboardPage() {
     await logout()
     router.push("/")
   }
+
+  const hasUpcoming = appointments.length > 0 || pendingReservations.length > 0
 
   return (
     <main className="flex flex-1 flex-col p-6">
@@ -87,15 +172,106 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Mis turnos</CardTitle>
-            <CardDescription>
-              Próximamente: turnos agendados y solicitudes de reserva.
-            </CardDescription>
+            {!hasUpcoming && !appointmentsLoading && (
+              <CardDescription>
+                No tenés turnos próximos.
+              </CardDescription>
+            )}
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">No tenés turnos próximos.</p>
+          <CardContent className="space-y-4">
+            {appointmentsLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                Cargando turnos...
+              </div>
+            ) : (
+              <>
+                {/* Pending reservations (awaiting payment) */}
+                {pendingReservations.map((res) => (
+                  <div
+                    key={res.externalReference}
+                    className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 p-3"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">
+                        {formatDate(res.startDate)} · {formatTime(res.startDate)} - {formatTime(res.endDate)}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+                        <span className="text-xs text-muted-foreground">Reserva pendiente de pago</span>
+                        <CountdownTimer expiresAt={res.expiresAt} />
+                      </div>
+                    </div>
+                    {res.initPoint && (
+                      <Button
+                        size="sm"
+                        onClick={() => window.open(res.initPoint!, "_blank")}
+                      >
+                        Pagar
+                      </Button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Upcoming appointments */}
+                {appointments
+                  .filter((apt) => new Date(apt.endDate) > new Date())
+                  .map((apt) => (
+                    <div
+                      key={apt.appointmentId}
+                      className="flex items-center justify-between rounded-lg border p-3"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">
+                          {formatDate(apt.startDate)} · {formatTime(apt.startDate)} - {formatTime(apt.endDate)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                          <span className="text-xs text-muted-foreground">Confirmado</span>
+                          {apt.professionalName && (
+                            <span className="text-xs text-muted-foreground">· {apt.professionalName}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                {/* Empty upcoming state */}
+                {!hasUpcoming && (
+                  <p className="text-sm text-muted-foreground">No tenés turnos próximos.</p>
+                )}
+
+                {/* Past appointments */}
+                {appointments.filter((apt) => new Date(apt.endDate) <= new Date()).length > 0 && (
+                  <div className="space-y-2 pt-2 border-t">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Anteriores</p>
+                    {appointments
+                      .filter((apt) => new Date(apt.endDate) <= new Date())
+                      .map((apt) => (
+                        <div
+                          key={apt.appointmentId}
+                          className="flex items-center justify-between rounded-lg border border-muted p-3 opacity-60"
+                        >
+                          <div className="space-y-0.5">
+                            <p className="text-sm">
+                              {formatDate(apt.startDate)} · {formatTime(apt.startDate)} - {formatTime(apt.endDate)}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              {apt.professionalName && (
+                                <span className="text-xs text-muted-foreground">{apt.professionalName}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </>
+            )}
+
             {selectedClinic?.slug && (
               <Button
-                className="mt-4"
+                className="w-full"
                 onClick={() => router.push(`/reservar/${selectedClinic.slug}`)}
               >
                 Reservar turno
