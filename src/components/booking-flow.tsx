@@ -364,7 +364,7 @@ export function BookingFlow({
     setPreferenceLoading(true)
     try {
       const idToken = await user.getIdToken()
-      const data = await api<{ preferenceId: string; initPoint: string }>(
+      const data = await api<{ preferenceId: string; externalReference: string; initPoint: string }>(
         "/api/public/appointments/preference",
         {
           method: "POST",
@@ -383,7 +383,26 @@ export function BookingFlow({
           },
         }
       )
-      window.location.href = data.initPoint
+
+      if (process.env.NEXT_PUBLIC_MOCK_PAYMENT === "true") {
+        // Mock mode: simulate approved payment by calling the webhook
+        const mockPaymentId = `mock_${Date.now()}`
+        const apiBaseUrl = process.env.NEXT_PUBLIC_SMILE_CONNECT_API_URL
+        await fetch(`${apiBaseUrl}/api/public/webhooks/mercadopago-booking?mock=true`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "payment",
+            data: { id: mockPaymentId },
+            _mock: true,
+            _externalReference: data.externalReference,
+          }),
+        })
+        // Redirect to same page with paymentRef so the polling picks it up
+        window.location.href = `/reservar/${slug}?paymentRef=${data.externalReference}`
+      } else {
+        window.location.href = data.initPoint
+      }
     } catch (error) {
       setBookingError(error instanceof ApiError ? error.message : "No pudimos preparar el pago")
       setPreferenceLoading(false)
