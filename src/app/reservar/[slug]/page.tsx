@@ -20,6 +20,10 @@ interface ClinicBySlugResponse {
     feePayer?: "clinic" | "patient"
     feePercentage?: number
     advanceBookingDays?: number
+    maxAdvanceBookingDays?: number | null
+    autoConfirm?: boolean
+    requirePhoneNumber?: boolean
+    requireIdNumber?: boolean
     mpPublicKey?: string | null
     products: BookableProduct[]
   }
@@ -92,6 +96,9 @@ export default async function BookingPage({ params }: BookingPageProps) {
                 feePayer={clinic.booking.feePayer ?? "clinic"}
                 feePercentage={clinic.booking.feePercentage ?? 3}
                 advanceBookingDays={clinic.booking.advanceBookingDays ?? 1}
+                maxAdvanceBookingDays={clinic.booking.maxAdvanceBookingDays ?? undefined}
+                requirePhoneNumber={clinic.booking.requirePhoneNumber ?? false}
+                requireIdNumber={clinic.booking.requireIdNumber ?? false}
               />
             </Suspense>
           ) : (

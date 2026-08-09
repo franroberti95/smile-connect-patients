@@ -47,6 +47,9 @@ interface BookingFlowProps {
   feePayer: "clinic" | "patient"
   feePercentage: number
   advanceBookingDays: number
+  maxAdvanceBookingDays?: number
+  requirePhoneNumber: boolean
+  requireIdNumber: boolean
 }
 
 const currencyCodeById: Record<number, string> = {
@@ -100,6 +103,17 @@ function getMinSelectableDate(timezone: string, advanceDays: number): Date {
   return new Date(year, month - 1, day + advanceDays)
 }
 
+function getMaxSelectableDate(timezone: string, maxAdvanceDays: number): Date {
+  const todayInTz = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: timezone,
+  }).format(new Date())
+  const [year, month, day] = todayInTz.split("-").map(Number)
+  return new Date(year, month - 1, day + maxAdvanceDays)
+}
+
 export function BookingFlow({
   slug,
   products,
@@ -110,6 +124,9 @@ export function BookingFlow({
   feePayer,
   feePercentage,
   advanceBookingDays,
+  maxAdvanceBookingDays,
+  requirePhoneNumber,
+  requireIdNumber,
 }: BookingFlowProps) {
   const { user } = useAuth()
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
@@ -127,6 +144,7 @@ export function BookingFlow({
   const [patientName, setPatientName] = useState("")
   const [patientSurname, setPatientSurname] = useState("")
   const [patientPhone, setPatientPhone] = useState("")
+  const [patientIdNumber, setPatientIdNumber] = useState("")
   const [existingPatient, setExistingPatient] = useState<{
     name: string
     surname: string
@@ -168,6 +186,15 @@ export function BookingFlow({
   const minSelectableDateString = useMemo(
     () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(minSelectableDate),
     [minSelectableDate, timezone]
+  )
+  const maxSelectableDateString = useMemo(
+    () =>
+      maxAdvanceBookingDays !== undefined
+        ? new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(
+            getMaxSelectableDate(timezone, maxAdvanceBookingDays)
+          )
+        : null,
+    [maxAdvanceBookingDays, timezone]
   )
   const selectedDateString = useMemo(
     () => new Intl.DateTimeFormat("en-CA", { timeZone: timezone }).format(selectedDate),
@@ -358,6 +385,14 @@ export function BookingFlow({
       setBookingError("Completá nombre y apellido")
       return
     }
+    if (!existingPatient && requirePhoneNumber && !patientPhone.trim()) {
+      setBookingError("Completá tu número de teléfono")
+      return
+    }
+    if (!existingPatient && requireIdNumber && !patientIdNumber.trim()) {
+      setBookingError("Completá tu número de documento")
+      return
+    }
     if (!selectedProduct || !selectedSlot || !user) return
 
     setBookingError(null)
@@ -379,6 +414,7 @@ export function BookingFlow({
               surname: patientSurname.trim(),
               email: user.email,
               phoneNumber: patientPhone.trim(),
+              idNumber: patientIdNumber.trim() || undefined,
             },
           },
         }
@@ -640,7 +676,9 @@ export function BookingFlow({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  disabled={maxSelectableDateString !== null && selectedDateString >= maxSelectableDateString}
                   onClick={() => {
+                    if (maxSelectableDateString !== null && selectedDateString >= maxSelectableDateString) return
                     const next = new Date(selectedDate)
                     next.setDate(next.getDate() + 1)
                     handleDateChange(next)
@@ -738,7 +776,9 @@ export function BookingFlow({
                     </div>
                   </div>
                   <div className="mt-4 space-y-2">
-                    <Label htmlFor="patient-phone">Teléfono</Label>
+                    <Label htmlFor="patient-phone">
+                      Teléfono{requirePhoneNumber && <span className="text-destructive"> *</span>}
+                    </Label>
                     <Input
                       id="patient-phone"
                       value={patientPhone}
@@ -746,6 +786,19 @@ export function BookingFlow({
                       placeholder="+54 9 11 1234 5678"
                     />
                   </div>
+                  {requireIdNumber && (
+                    <div className="mt-4 space-y-2">
+                      <Label htmlFor="patient-id-number">
+                        DNI / Documento<span className="text-destructive"> *</span>
+                      </Label>
+                      <Input
+                        id="patient-id-number"
+                        value={patientIdNumber}
+                        onChange={(e) => setPatientIdNumber(e.target.value)}
+                        placeholder="12345678"
+                      />
+                    </div>
+                  )}
                 </>
               )}
 
