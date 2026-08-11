@@ -151,6 +151,7 @@ export function BookingFlow({
     phoneNumber: string | null
   } | null>(null)
   const [existingPatientLoading, setExistingPatientLoading] = useState(true)
+  const [emailAmbiguous, setEmailAmbiguous] = useState(false)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [bookingSuccess, setBookingSuccess] = useState(false)
   const [preferenceLoading, setPreferenceLoading] = useState(false)
@@ -230,7 +231,7 @@ export function BookingFlow({
     user
       .getIdToken()
       .then((idToken) =>
-        api<{ patient: { name: string; surname: string; phoneNumber: string | null } | null }>(
+        api<{ patient: { name: string; surname: string; phoneNumber: string | null } | null; emailAmbiguous?: boolean }>(
           `/api/public/patient/me?slug=${encodeURIComponent(slug)}`,
           { headers: { Authorization: `Bearer ${idToken}` } }
         )
@@ -238,6 +239,7 @@ export function BookingFlow({
       .then((data) => {
         if (cancelled) return
         setExistingPatient(data.patient)
+        setEmailAmbiguous(data.emailAmbiguous ?? false)
         if (data.patient) {
           setPatientName(data.patient.name)
           setPatientSurname(data.patient.surname)
@@ -381,6 +383,10 @@ export function BookingFlow({
   }
 
   const handleContinueToPayment = async () => {
+    if (emailAmbiguous) {
+      setBookingError("Tu email está asociado a más de un paciente en esta clínica. Contactá a la clínica para resolverlo.")
+      return
+    }
     if (!existingPatient && (!patientName.trim() || !patientSurname.trim())) {
       setBookingError("Completá nombre y apellido")
       return
@@ -806,15 +812,22 @@ export function BookingFlow({
                 <p className="mt-4 text-sm text-destructive">{bookingError}</p>
               )}
 
-              <Button
-                type="button"
-                className="mt-5 w-full"
-                size="lg"
-                disabled={preferenceLoading}
-                onClick={handleContinueToPayment}
-              >
-                {preferenceLoading ? "Redirigiendo a Mercado Pago..." : "Continuar al pago"}
-              </Button>
+              {emailAmbiguous ? (
+                <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  No podemos continuar con la reserva porque tu email está asociado a más de un paciente en esta
+                  clínica. Contactá a la clínica para resolverlo antes de reservar.
+                </p>
+              ) : (
+                <Button
+                  type="button"
+                  className="mt-5 w-full"
+                  size="lg"
+                  disabled={preferenceLoading}
+                  onClick={handleContinueToPayment}
+                >
+                  {preferenceLoading ? "Redirigiendo a Mercado Pago..." : "Continuar al pago"}
+                </Button>
+              )}
             </section>
           )}
         </div>

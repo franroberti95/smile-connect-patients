@@ -64,6 +64,7 @@ export default function DashboardPage() {
   const [appointments, setAppointments] = useState<PatientAppointment[]>([])
   const [pendingReservations, setPendingReservations] = useState<PendingReservation[]>([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(true)
+  const [emailAmbiguous, setEmailAmbiguous] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -136,6 +137,29 @@ export default function DashboardPage() {
       fetchAppointments()
     }
   }, [loading, user, selectedClinic, fetchAppointments])
+
+  useEffect(() => {
+    if (loading || !user || !selectedClinic?.slug || selectedClinic.status !== "active") return
+    let cancelled = false
+    getIdToken()
+      .then((idToken) => {
+        if (!idToken) return null
+        return api<{ emailAmbiguous?: boolean }>(
+          `/api/public/patient/me?slug=${encodeURIComponent(selectedClinic.slug!)}`,
+          { headers: { Authorization: `Bearer ${idToken}` } }
+        )
+      })
+      .then((data) => {
+        if (cancelled || !data) return
+        setEmailAmbiguous(data.emailAmbiguous ?? false)
+      })
+      .catch(() => {
+        if (!cancelled) setEmailAmbiguous(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [loading, user, selectedClinic])
 
   if (loading) {
     return (
@@ -270,12 +294,19 @@ export default function DashboardPage() {
             )}
 
             {selectedClinic?.slug && (
-              <Button
-                className="w-full"
-                onClick={() => router.push(`/reservar/${selectedClinic.slug}`)}
-              >
-                Reservar turno
-              </Button>
+              emailAmbiguous ? (
+                <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  No podés reservar turnos online porque tu email está asociado a más de un paciente en esta
+                  clínica. Contactá a la clínica para resolverlo.
+                </p>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => router.push(`/reservar/${selectedClinic.slug}`)}
+                >
+                  Reservar turno
+                </Button>
+              )
             )}
           </CardContent>
         </Card>
