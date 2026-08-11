@@ -61,6 +61,7 @@ export function PatientRegistrationForm({ clinic, userEmail, onRegistered, onCan
     if (!form.name.trim()) nextErrors.name = REQUIRED_ERROR
     if (!form.surname.trim()) nextErrors.surname = REQUIRED_ERROR
     if (!form.phone_number.trim()) nextErrors.phone_number = REQUIRED_ERROR
+    if (!form.id_number.trim()) nextErrors.id_number = REQUIRED_ERROR
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -166,7 +167,7 @@ export function PatientRegistrationForm({ clinic, userEmail, onRegistered, onCan
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="id_number">DNI / Documento</Label>
+              <Label htmlFor="id_number">DNI / Documento *</Label>
               <Input
                 id="id_number"
                 value={form.id_number}
@@ -174,6 +175,7 @@ export function PatientRegistrationForm({ clinic, userEmail, onRegistered, onCan
                 placeholder="12345678"
                 disabled={loading}
               />
+              {errors.id_number && <p className="text-sm text-destructive">{errors.id_number}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="birth_day">Fecha de nacimiento</Label>

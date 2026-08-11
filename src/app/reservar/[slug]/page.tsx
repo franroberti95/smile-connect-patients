@@ -97,8 +97,8 @@ export default async function BookingPage({ params }: BookingPageProps) {
                 feePercentage={clinic.booking.feePercentage ?? 3}
                 advanceBookingDays={clinic.booking.advanceBookingDays ?? 1}
                 maxAdvanceBookingDays={clinic.booking.maxAdvanceBookingDays ?? undefined}
-                requirePhoneNumber={clinic.booking.requirePhoneNumber ?? false}
-                requireIdNumber={clinic.booking.requireIdNumber ?? false}
+                requirePhoneNumber={true}
+                requireIdNumber={true}
               />
             </Suspense>
           ) : (
