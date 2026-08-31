@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
+import { FirebaseError, initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app"
 import {
   getAuth,
   GoogleAuthProvider,
@@ -30,7 +30,8 @@ if (typeof window !== "undefined" || process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
     auth = getAuth(app)
 
     googleProvider = new GoogleAuthProvider()
-    googleProvider.setCustomParameters({ prompt: "select_account", scope: "email" })
+    googleProvider.addScope("email")
+    googleProvider.setCustomParameters({ prompt: "select_account" })
   } catch (error) {
     console.warn("Firebase initialization failed:", error)
   }
@@ -54,9 +55,9 @@ export async function loginWithEmail(email: string, password: string): Promise<U
   try {
     const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password)
     return credential.user
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Fallback for existing users registered with dots in Firebase
-    if (error.code === "auth/user-not-found" && normalizedEmail !== email.toLowerCase().trim()) {
+    if (error instanceof FirebaseError && error.code === "auth/user-not-found" && normalizedEmail !== email.toLowerCase().trim()) {
       const credential = await signInWithEmailAndPassword(auth, email, password)
       return credential.user
     }

@@ -15,7 +15,6 @@ interface ClinicBySlugResponse {
     enabled: boolean
     paymentMode?: "full" | "deposit"
     depositPercentage?: number
-    bookingConfirmationMessage?: string
     cancellationPolicy?: string
     feePayer?: "clinic" | "patient"
     feePercentage?: number
