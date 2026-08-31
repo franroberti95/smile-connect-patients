@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   CalendarDays,
   Check,
@@ -128,7 +128,8 @@ export function BookingFlow({
   requirePhoneNumber,
   requireIdNumber,
 }: BookingFlowProps) {
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null)
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<number | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date>(() => {
@@ -161,6 +162,12 @@ export function BookingFlow({
 
   type StepId = "service" | "professional" | "datetime" | "payment"
   const [currentStep, setCurrentStep] = useState<StepId>("service")
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace(`/login?next=${encodeURIComponent(`/reservar/${slug}`)}`)
+    }
+  }, [authLoading, router, slug, user])
 
   const selectedProduct = useMemo(
     () => products.find((p) => p.productId === selectedProductId),
@@ -468,6 +475,14 @@ export function BookingFlow({
     ]
     return base
   }, [selectedProduct, selectedProfessionalId, selectedSlot, bookingSuccess, currentStep, stepRequiresProfessional])
+
+  if (authLoading || !user) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-16">
+        <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      </div>
+    )
+  }
 
   if (confirmingRedirectPayment) {
     return (

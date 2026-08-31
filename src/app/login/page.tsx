@@ -19,6 +19,11 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
+function getPostLoginPath() {
+  const next = new URLSearchParams(window.location.search).get("next")
+  return next?.startsWith("/") && !next.startsWith("//") ? next : "/select-clinic"
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const { loginWithEmail, loginWithGoogle } = useAuth()
@@ -38,7 +43,7 @@ export default function LoginPage() {
     try {
       await loginWithEmail(data.email, data.password)
       toast.success("¡Bienvenido!")
-      router.push("/select-clinic")
+      router.push(getPostLoginPath())
     } catch (error: any) {
       console.error(error)
       toast.error(error.message || "No pudimos iniciar sesión. Intentalo de nuevo.")
@@ -52,7 +57,7 @@ export default function LoginPage() {
     try {
       await loginWithGoogle()
       toast.success("¡Bienvenido!")
-      router.push("/select-clinic")
+      router.push(getPostLoginPath())
     } catch (error: any) {
       console.error(error)
       toast.error(error.message || "No pudimos iniciar sesión con Google.")
