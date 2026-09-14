@@ -23,6 +23,8 @@ interface ClinicBySlugResponse {
     autoConfirm?: boolean
     requirePhoneNumber?: boolean
     requireIdNumber?: boolean
+    allowPatientFiles?: boolean
+    allowPatientRecipes?: boolean
     mpPublicKey?: string | null
     products: BookableProduct[]
   }

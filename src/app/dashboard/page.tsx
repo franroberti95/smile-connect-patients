@@ -110,7 +110,10 @@ export default function DashboardPage() {
 
   // Fetch patient appointments and pending reservations
   const fetchAppointments = useCallback(async () => {
-    if (!selectedClinic?.slug) return
+    if (!selectedClinic?.clinicId) {
+      setAppointmentsLoading(false)
+      return
+    }
     try {
       const idToken = await getIdToken()
       if (!idToken) return
@@ -119,7 +122,7 @@ export default function DashboardPage() {
         appointments: PatientAppointment[]
         pendingReservations: PendingReservation[]
         reservationMinutes: number
-      }>(`/api/public/patient/appointments?slug=${selectedClinic.slug}`, {
+      }>(`/api/public/patient/appointments?clinicId=${selectedClinic.clinicId}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       })
 
@@ -130,7 +133,7 @@ export default function DashboardPage() {
     } finally {
       setAppointmentsLoading(false)
     }
-  }, [selectedClinic?.slug])
+  }, [selectedClinic?.clinicId])
 
   useEffect(() => {
     if (!loading && user && selectedClinic?.status === "active") {

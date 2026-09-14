@@ -16,6 +16,8 @@ export interface PatientClinic {
   logoUrl: string | null
   slug: string | null
   status: "active" | "registration_required" | "pending_approval"
+  allowPatientFiles?: boolean
+  allowPatientRecipes?: boolean
 }
 
 interface AuthContextValue {
