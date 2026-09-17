@@ -27,6 +27,8 @@ interface PendingReservation {
   clinicName: string
 }
 
+type DashboardSection = "appointments" | "files" | "recipes" | "payments"
+
 function formatDate(iso: string) {
   const d = new Date(iso)
   return d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })
@@ -66,6 +68,7 @@ export default function DashboardPage() {
   const [pendingReservations, setPendingReservations] = useState<PendingReservation[]>([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(true)
   const [emailAmbiguous, setEmailAmbiguous] = useState(false)
+  const [activeSection, setActiveSection] = useState<DashboardSection>("appointments")
   const selectedClinicId = selectedClinic?.clinicId
 
   useEffect(() => {
@@ -182,6 +185,15 @@ export default function DashboardPage() {
   }
 
   const hasUpcoming = appointments.length > 0 || pendingReservations.length > 0
+  const sections: Array<{ id: DashboardSection; label: string }> = [
+    { id: "appointments", label: "Turnos" },
+    ...(selectedClinic.allowPatientFiles ? [{ id: "files" as const, label: "Archivos" }] : []),
+    ...(selectedClinic.allowPatientRecipes ? [{ id: "recipes" as const, label: "Recetas" }] : []),
+    { id: "payments", label: "Pagos" },
+  ]
+  const visibleSection = sections.some((section) => section.id === activeSection)
+    ? activeSection
+    : "appointments"
 
   return (
     <main className="flex flex-1 flex-col p-6">
@@ -198,7 +210,30 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        <Card>
+        <div
+          role="tablist"
+          aria-label="Secciones del portal"
+          className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/40 p-1"
+        >
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              type="button"
+              role="tab"
+              aria-selected={visibleSection === section.id}
+              onClick={() => setActiveSection(section.id)}
+              className={`min-w-fit flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                visibleSection === section.id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {section.label}
+            </button>
+          ))}
+        </div>
+
+        {visibleSection === "appointments" && <Card>
           <CardHeader>
             <CardTitle>Mis turnos</CardTitle>
             {!hasUpcoming && !appointmentsLoading && (
@@ -314,15 +349,16 @@ export default function DashboardPage() {
               )
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         <PatientPortalContent
           clinicId={selectedClinic.clinicId}
           allowFiles={selectedClinic.allowPatientFiles ?? false}
           allowRecipes={selectedClinic.allowPatientRecipes ?? false}
+          activeSection={visibleSection === "files" || visibleSection === "recipes" ? visibleSection : null}
         />
 
-        <Card>
+        {visibleSection === "payments" && <Card>
           <CardHeader>
             <CardTitle>Pagos</CardTitle>
             <CardDescription>
@@ -332,7 +368,7 @@ export default function DashboardPage() {
           <CardContent>
             <p className="text-sm text-muted-foreground">No tenés pagos pendientes.</p>
           </CardContent>
-        </Card>
+        </Card>}
       </div>
     </main>
   )

@@ -34,6 +34,7 @@ interface PatientPortalContentProps {
   clinicId: number
   allowFiles: boolean
   allowRecipes: boolean
+  activeSection: "files" | "recipes" | null
 }
 
 function formatDate(value: string | null) {
@@ -48,7 +49,7 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export function PatientPortalContent({ clinicId, allowFiles, allowRecipes }: PatientPortalContentProps) {
+export function PatientPortalContent({ clinicId, allowFiles, allowRecipes, activeSection }: PatientPortalContentProps) {
   const [files, setFiles] = useState<PatientFile[]>([])
   const [recipes, setRecipes] = useState<PatientRecipe[]>([])
   const [filesLoading, setFilesLoading] = useState(allowFiles)
@@ -124,7 +125,7 @@ export function PatientPortalContent({ clinicId, allowFiles, allowRecipes }: Pat
 
   return (
     <>
-      {allowFiles && (
+      {allowFiles && activeSection === "files" && (
         <Card>
           <CardHeader>
             <CardTitle>Mis archivos</CardTitle>
@@ -163,7 +164,7 @@ export function PatientPortalContent({ clinicId, allowFiles, allowRecipes }: Pat
         </Card>
       )}
 
-      {allowRecipes && (
+      {allowRecipes && activeSection === "recipes" && (
         <Card>
           <CardHeader>
             <CardTitle>Mis recetas</CardTitle>
