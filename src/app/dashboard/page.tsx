@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAuth, type PatientClinic } from "@/components/auth-provider"
 import { api } from "@/lib/api"
 import { getIdToken } from "@/lib/firebase"
+import { PatientPortalContent } from "@/components/patient-portal-content"
 
 interface PatientAppointment {
   appointmentId: number
@@ -65,6 +66,7 @@ export default function DashboardPage() {
   const [pendingReservations, setPendingReservations] = useState<PendingReservation[]>([])
   const [appointmentsLoading, setAppointmentsLoading] = useState(true)
   const [emailAmbiguous, setEmailAmbiguous] = useState(false)
+  const selectedClinicId = selectedClinic?.clinicId
 
   useEffect(() => {
     if (!loading && !user) {
@@ -110,7 +112,7 @@ export default function DashboardPage() {
 
   // Fetch patient appointments and pending reservations
   const fetchAppointments = useCallback(async () => {
-    if (!selectedClinic?.clinicId) {
+    if (!selectedClinicId) {
       setAppointmentsLoading(false)
       return
     }
@@ -122,7 +124,7 @@ export default function DashboardPage() {
         appointments: PatientAppointment[]
         pendingReservations: PendingReservation[]
         reservationMinutes: number
-      }>(`/api/public/patient/appointments?clinicId=${selectedClinic.clinicId}`, {
+      }>(`/api/public/patient/appointments?clinicId=${selectedClinicId}`, {
         headers: { Authorization: `Bearer ${idToken}` },
       })
 
@@ -133,12 +135,12 @@ export default function DashboardPage() {
     } finally {
       setAppointmentsLoading(false)
     }
-  }, [selectedClinic?.clinicId])
+  }, [selectedClinicId])
 
   useEffect(() => {
-    if (!loading && user && selectedClinic?.status === "active") {
-      fetchAppointments()
-    }
+    if (loading || !user || selectedClinic?.status !== "active") return
+    const timeoutId = window.setTimeout(() => void fetchAppointments(), 0)
+    return () => window.clearTimeout(timeoutId)
   }, [loading, user, selectedClinic, fetchAppointments])
 
   useEffect(() => {
@@ -313,6 +315,12 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        <PatientPortalContent
+          clinicId={selectedClinic.clinicId}
+          allowFiles={selectedClinic.allowPatientFiles ?? false}
+          allowRecipes={selectedClinic.allowPatientRecipes ?? false}
+        />
 
         <Card>
           <CardHeader>
