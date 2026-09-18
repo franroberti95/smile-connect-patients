@@ -189,7 +189,7 @@ export default function DashboardPage() {
     { id: "appointments", label: "Turnos" },
     ...(selectedClinic.allowPatientFiles ? [{ id: "files" as const, label: "Archivos" }] : []),
     ...(selectedClinic.allowPatientRecipes ? [{ id: "recipes" as const, label: "Recetas" }] : []),
-    { id: "payments", label: "Pagos" },
+    // { id: "payments", label: "Pagos" },
   ]
   const visibleSection = sections.some((section) => section.id === activeSection)
     ? activeSection
@@ -358,17 +358,19 @@ export default function DashboardPage() {
           activeSection={visibleSection === "files" || visibleSection === "recipes" ? visibleSection : null}
         />
 
-        {visibleSection === "payments" && <Card>
-          <CardHeader>
-            <CardTitle>Pagos</CardTitle>
-            <CardDescription>
-              Próximamente: resumen de pagos pendientes y facturas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">No tenés pagos pendientes.</p>
-          </CardContent>
-        </Card>}
+        {/**
+          visibleSection === "payments" && <Card>
+            <CardHeader>
+              <CardTitle>Pagos</CardTitle>
+              <CardDescription>
+                Próximamente: resumen de pagos pendientes y facturas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">No tenés pagos pendientes.</p>
+            </CardContent>
+          </Card>
+        */}
       </div>
     </main>
   )
