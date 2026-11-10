@@ -2,7 +2,7 @@ import { Clock, MapPin, Phone } from "lucide-react"
 import { getLandingCopy } from "@/lib/landing/copy"
 import {
   ActionLink, BookingNotes, ClinicLogo, ContactDetails, FaqList, LandingFooter, LandingPhoto,
-  StickyMobileCta, servicePrice, type LandingTemplateProps,
+  StickyMobileCta, heroCtaProps, servicePrice, serviceSubtitle, type LandingTemplateProps,
 } from "../shared"
 
 const primaryClass = "rounded-lg bg-[#1D4ED8] text-white hover:bg-[#1E40AF] focus-visible:ring-[#1D4ED8]"
@@ -36,7 +36,7 @@ export function PuntoTemplate({ page }: LandingTemplateProps) {
                 ))}
               </ul>
             )}
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3" {...heroCtaProps}>
               {page.primaryAction && <ActionLink action={page.primaryAction} t={t} className={primaryClass} />}
               {page.secondaryAction && <ActionLink action={page.secondaryAction} t={t} className={secondaryClass} />}
             </div>
@@ -68,7 +68,7 @@ export function PuntoTemplate({ page }: LandingTemplateProps) {
                   <li key={service.productId} className="flex items-center gap-4 p-4">
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold">{service.name}</h3>
-                      <p className="flex items-center gap-1.5 text-sm text-slate-500"><Clock className="h-3.5 w-3.5" aria-hidden />{service.durationMinutes} {t.minutes} · {service.procedureName}</p>
+                      <p className="flex items-center gap-1.5 text-sm text-slate-500"><Clock className="h-3.5 w-3.5" aria-hidden />{service.durationMinutes} {t.minutes}{serviceSubtitle(service) ? ` · ${serviceSubtitle(service)}` : ""}</p>
                     </div>
                     {price && <span className="font-bold tabular-nums">{price}</span>}
                     {bookingAction && (

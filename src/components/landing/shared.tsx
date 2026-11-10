@@ -3,6 +3,8 @@ import { Mail, MapPin, MessageCircle, Phone, CalendarCheck, ExternalLink } from 
 import { actionLabel, bookingNotes, formatPrice, getLandingCopy, isExternalAction, type LandingCopy } from "@/lib/landing/copy"
 import type { LandingAction, PublicLandingPage } from "@/lib/landing/types"
 import { cn } from "@/lib/utils"
+import { HERO_CTA_ATTRIBUTE } from "@/lib/landing/hero-cta"
+import { WhenHeroCtaHidden } from "./sticky-visibility"
 
 export interface LandingTemplateProps {
   page: PublicLandingPage
@@ -50,9 +52,11 @@ export function StickyMobileCta({ page, className }: { page: PublicLandingPage; 
   const t = getLandingCopy(page.locale)
   if (!page.primaryAction) return null
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 p-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-      <ActionLink action={page.primaryAction} t={t} className={cn("w-full", className)} />
-    </div>
+    <WhenHeroCtaHidden>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/10 bg-white/95 p-3 backdrop-blur md:hidden" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+        <ActionLink action={page.primaryAction} t={t} className={cn("w-full", className)} />
+      </div>
+    </WhenHeroCtaHidden>
   )
 }
 
@@ -72,6 +76,17 @@ export function ClinicLogo({ page, className }: { page: PublicLandingPage; class
       <Image src={page.clinic.logoUrl} alt="" fill sizes="40px" className="object-contain" />
     </span>
   )
+}
+
+/** Marks the hero button group; the sticky mobile CTA stays hidden while it is on screen. */
+export const heroCtaProps = { [HERO_CTA_ATTRIBUTE]: "true" } as const
+
+const normalizeLabel = (value: string) => value.trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+/** The procedure name, unless it just repeats the service name. */
+export function serviceSubtitle(service: PublicLandingPage["services"][number]): string | null {
+  const procedure = service.procedureName?.trim()
+  return procedure && normalizeLabel(procedure) !== normalizeLabel(service.name) ? procedure : null
 }
 
 export function servicePrice(page: PublicLandingPage, service: PublicLandingPage["services"][number]) {
