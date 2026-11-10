@@ -3,7 +3,8 @@ import { Mail, MapPin, MessageCircle, Phone, CalendarCheck, ExternalLink } from 
 import { actionLabel, bookingNotes, formatPrice, getLandingCopy, isExternalAction, type LandingCopy } from "@/lib/landing/copy"
 import type { LandingAction, PublicLandingPage } from "@/lib/landing/types"
 import { cn } from "@/lib/utils"
-import { HERO_CTA_ATTRIBUTE, WhenHeroCtaHidden } from "./sticky-visibility"
+import { HERO_CTA_ATTRIBUTE } from "@/lib/landing/hero-cta"
+import { WhenHeroCtaHidden } from "./sticky-visibility"
 
 export interface LandingTemplateProps {
   page: PublicLandingPage
@@ -78,7 +79,7 @@ export function ClinicLogo({ page, className }: { page: PublicLandingPage; class
 }
 
 /** Marks the hero button group; the sticky mobile CTA stays hidden while it is on screen. */
-export const heroCtaProps = { [HERO_CTA_ATTRIBUTE]: "" } as const
+export const heroCtaProps = { [HERO_CTA_ATTRIBUTE]: "true" } as const
 
 const normalizeLabel = (value: string) => value.trim().toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
