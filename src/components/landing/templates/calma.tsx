@@ -2,7 +2,7 @@ import { Check, Clock } from "lucide-react"
 import { getLandingCopy } from "@/lib/landing/copy"
 import {
   ActionLink, BookingNotes, ClinicLogo, ContactDetails, FaqList, LandingFooter, LandingPhoto,
-  StickyMobileCta, servicePrice, type LandingTemplateProps,
+  StickyMobileCta, heroCtaProps, servicePrice, serviceSubtitle, type LandingTemplateProps,
 } from "../shared"
 
 const primaryClass = "bg-[#2F6F6A] text-white hover:bg-[#255955] focus-visible:ring-[#2F6F6A]"
@@ -19,18 +19,18 @@ export function CalmaTemplate({ page }: LandingTemplateProps) {
       </header>
 
       <main>
-        <section className="mx-auto grid max-w-6xl items-center gap-10 px-6 pb-16 pt-6 md:grid-cols-2 md:pt-12">
+        <section className="mx-auto grid max-w-6xl items-center gap-8 px-6 pb-16 pt-2 md:grid-cols-2 md:gap-10 md:pt-12">
           <div className="space-y-6">
             <h1 className="text-4xl font-bold leading-tight tracking-tight text-[#1F3B39] md:text-5xl">{page.hero.headline}</h1>
             <p className="text-lg leading-relaxed text-[#4A4744]">{page.hero.subheadline}</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3" {...heroCtaProps}>
               {page.primaryAction && <ActionLink action={page.primaryAction} t={t} className={primaryClass} />}
               {page.secondaryAction && <ActionLink action={page.secondaryAction} t={t} className={secondaryClass} />}
             </div>
             <BookingNotes page={page} className="text-[#5C5853]" />
           </div>
           {page.hero.image ? (
-            <LandingPhoto image={page.hero.image} priority sizes="(min-width: 768px) 50vw, 100vw" className="aspect-[4/3] rounded-[2rem] shadow-xl shadow-[#2F6F6A]/10" />
+            <LandingPhoto image={page.hero.image} priority sizes="(min-width: 768px) 50vw, 100vw" className="order-first aspect-[16/9] rounded-[1.5rem] shadow-xl shadow-[#2F6F6A]/10 md:order-none md:aspect-[4/3] md:rounded-[2rem]" />
           ) : (
             <div aria-hidden className="hidden aspect-[4/3] rounded-[2rem] bg-gradient-to-br from-[#DCEBE7] to-[#F3E6D8] md:block" />
           )}
@@ -55,10 +55,11 @@ export function CalmaTemplate({ page }: LandingTemplateProps) {
             <ul className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {page.services.map((service) => {
                 const price = servicePrice(page, service)
+                const subtitle = serviceSubtitle(service)
                 return (
                   <li key={service.productId} className="flex flex-col rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
                     <h3 className="text-lg font-semibold">{service.name}</h3>
-                    <p className="text-sm text-[#5C5853]">{service.procedureName}</p>
+                    {subtitle && <p className="text-sm text-[#5C5853]">{subtitle}</p>}
                     <div className="mt-auto flex items-center justify-between pt-6">
                       <span className="inline-flex items-center gap-1.5 text-sm text-[#5C5853]"><Clock className="h-4 w-4" aria-hidden />{service.durationMinutes} {t.minutes}</span>
                       {price && <span className="text-lg font-semibold text-[#1F3B39]">{price}</span>}

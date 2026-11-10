@@ -1,7 +1,7 @@
 import { getLandingCopy } from "@/lib/landing/copy"
 import {
   ActionLink, BookingNotes, ContactDetails, FaqList, LandingFooter, LandingPhoto,
-  StickyMobileCta, servicePrice, type LandingTemplateProps,
+  StickyMobileCta, heroCtaProps, servicePrice, serviceSubtitle, type LandingTemplateProps,
 } from "../shared"
 
 const primaryClass = "bg-[#1A1A1A] text-[#F4F1EA] hover:bg-black focus-visible:ring-[#1A1A1A]"
@@ -25,7 +25,7 @@ export function EstudioTemplate({ page }: LandingTemplateProps) {
           <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[1.05] md:text-7xl">{page.hero.headline}</h1>
           <div className="mt-10 grid gap-8 md:grid-cols-[1fr_auto] md:items-end">
             <p className="max-w-2xl text-lg leading-relaxed text-[#3D3A35]">{page.hero.subheadline}</p>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-3" {...heroCtaProps}>
               {page.primaryAction && <ActionLink action={page.primaryAction} t={t} className={`rounded-none ${primaryClass}`} />}
               {page.secondaryAction && <ActionLink action={page.secondaryAction} t={t} className={`rounded-none ${secondaryClass}`} />}
             </div>
@@ -64,7 +64,7 @@ export function EstudioTemplate({ page }: LandingTemplateProps) {
                     <li key={service.productId} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-6">
                       <div>
                         <h3 className="font-serif text-2xl">{service.name}</h3>
-                        <p className="text-sm text-[#CFC8BA]">{service.procedureName} · {service.durationMinutes} {t.minutes}</p>
+                        <p className="text-sm text-[#CFC8BA]">{[serviceSubtitle(service), `${service.durationMinutes} ${t.minutes}`].filter(Boolean).join(" · ")}</p>
                       </div>
                       {price && <span className="text-lg tabular-nums">{price}</span>}
                     </li>
